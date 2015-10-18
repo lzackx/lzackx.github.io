@@ -16,7 +16,7 @@ html,body {
 }
 
 .nav {
-	color: #707070;
+	color: #000000;
 	text-transform: uppercase;
     font-size: 16px;
     font-weight: 600;
@@ -36,7 +36,7 @@ li {
 }
 
 .nav a {
-    color: #959BA6;
+    color: #66ccff;
 }
 
 .nav a:link {
@@ -58,11 +58,11 @@ li {
 }
 
 .title li a {
-    color: #FFF;
+    color: #66ccff;
 }
 
 .title li a:link {
-    color: #FFF;
+    color: #66ffcc;
 }
 
 .title li a:visited {
@@ -73,14 +73,14 @@ li {
 
 .title li a:hover {
     opacity: 1;
-    color: #FFF;
+    color: #66ccff;
 }
 
 .description {
     padding-top: 10px;
     font-size: 12px;
     line-height: 1.5em;
-    color: #EEE;
+    color: #222333;
 }
 
 .social-links {
