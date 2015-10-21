@@ -1,9 +1,9 @@
 # Site settings
 title: lZackx
-motto: To be a Full Stack Developer
+motto: I am the Will of my Codes
 email: zackx@foxmail.com
 description: > # this means to ignore newlines until "baseurl:"
-  To Be A Full Stack Developer.
+  A Full Stack Developer.
 baseurl: "" # the subpath of your site, e.g. /blog/
 url: "http://lzackx.github.io" # the base hostname & protocol for your site
 #twitter_username: jekyllrb

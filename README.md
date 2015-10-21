@@ -1,4 +1,5 @@
-# lzackx.github.io
+## lzackx.github.io
 
-## MIT License
+### License
 
+The lzackx.github.io is licensed under the MIT license
