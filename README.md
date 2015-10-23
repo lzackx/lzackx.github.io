@@ -1,4 +1,4 @@
-## lzackx.github.io
+## http://lzackx.github.io
 
 This is the data for my blog，and it is published at http://lzackx.com as well.
 
