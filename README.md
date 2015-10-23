@@ -1,5 +1,12 @@
 ## lzackx.github.io
 
+This is the data for my blog，and it is published at http://lzackx.com as well.
+
 ### License
 
-The lzackx.github.io is licensed under the MIT license
+The following directories and their contents are Copyright lZackx. You may not reuse anything therein without my permission:
+
+* _posts/
+* images/
+
+All other directories and files are MIT Licensed.
