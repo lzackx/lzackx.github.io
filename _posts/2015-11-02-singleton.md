@@ -18,8 +18,6 @@ categories: pattern
 
 单例模式示例代码如下（swift语言）：
 
-```swift
-
     class Singleton{
     
         private static let singleton = Singleton();
@@ -30,8 +28,7 @@ categories: pattern
             return singleton;
         }
     }
-    
-```
+
 
 &emsp;&emsp;**代码分析**：这是一个线程安全的单例模式定义，`singleton`是类型属性(Type Properties)，`getIntance()`是类型方法(Type Methods),全局可以通过调用`Singleton.getInstance()`来获取单例实例对象（假如代码是以库的形式存在，调用时可能需要在其前面添加`public`关键字），但要注意的是`init()`这个类构造函数需要显式为`private`，因为swift默认类中的方法都是internal访问级别，而为了单例模式中“惟一”这个定义，一旦构造函数被私有化了，那么就可以防止其它地方创建，而只能通过`getIntance()`类型方法获取。
 
