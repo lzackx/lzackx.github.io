@@ -18,9 +18,10 @@ categories: pattern
 
 单例模式示例代码如下（swift语言）：
 
-```swift
+```
 
 class Singleton{
+
     private static let singleton = Singleton();
     
     private init(){}
@@ -28,7 +29,6 @@ class Singleton{
     static func getInstance()->Singleton{
         return singleton;
     }
-    
 }
 
 ```
