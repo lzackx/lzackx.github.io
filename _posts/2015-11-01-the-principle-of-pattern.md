@@ -9,7 +9,7 @@ categories: pattern
 &emsp;&emsp;面向对象的开发模式有几个原则需要遵循：
 
 1. 开闭原则（Open Closed Principle，OCP）
-2. 单一指责原则（Single Responsibility Principle）
+2. 单一职责原则（Single Responsibility Principle，SRP）
 3. 里氏代换原则（Liskov Substitution Principle，LSP）
 4. 依赖倒转原则（Dependency Inversion Principle，DIP）
 5. 接口隔离原则（Interface Segregation Principle，ISP）
@@ -21,7 +21,7 @@ categories: pattern
 
 &emsp;&emsp;这一原则很简单也很难，简单在一个这个原则就是叫Coder写了类或者函数的一些功能了，就不要改了，如果有需求的话，就对这些进行扩展，即可加不可改。而同样很难，难在要写出这样面相对象的代码时，每时每刻都要很清楚所写的代码已经足够抽象，使模块能被扩展而又不会影响其它模块，那么这样的代码写出来后就能在以后的迭代中更少地考虑是否会对现在的各种功能产生bug。
 
-## 单一指责原则（Single Responsibility Principle）##
+## 单一职责原则（Single Responsibility Principle，SRP）##
 * 一个类只负责一项职责，不能存在多个导致类变更的原因。
 
 &emsp;&emsp;这一原则很好理解，就是说类的性质在定义之前就要想好，类该负责一件事，而不是几件事，原因是假如负责了多件事，那么在代码量变大之后需要改一件事，由于耦合的原因，可能会导致其它负责的事情也受了影响，所以在定义的时候需要思考分析这个类具体的功能是否已经足够“原子”。
