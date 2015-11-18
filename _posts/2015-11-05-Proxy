@@ -1,0 +1,67 @@
+---
+layout: post
+title:  "代理模式：设计模式系列（四）"
+date:   2015-11-05 00:00:00
+categories: pattern
+---
+&emsp;&emsp;**代理模式（Proxy Pattern）**:为其他对象提供一种代理，以控制对这个对象的访问，归类为结构型模式。
+
+&emsp;&emsp;这一模式的解读分为以下几个方面：
+
+* 需要调用对象的时候不是直接调用对象本身，而是通过代理
+* 代理类与目标对象实现类具有同一接口或协议。
+* 代理在访问目标对象前后，可以适当进行扩展。
+
+&emsp;&emsp;使用代理模式的思考过程如下：
+
+1. 在不希望直接使用一个对象时，通常本质原因可能是目标对象对资源消耗大，或出于安全保护的目的。
+2. 需要在使用前后额外添加一些操作时。
+
+&emsp;&emsp;那么现在可以比较清晰地看出代理模式在代码中体现的结构了，可以分为代理与目标对象类的接口或协议、代理实现类、目标对象实现类。
+
+代理模式示例代码如下（Swift语言）：
+
+	protocol BluePrint{
+	    
+	    func call();
+	}
+
+	class Object:BluePrint{
+	    
+	    func call() {
+	        print("I am Object call");
+	    }
+	}
+
+	class Proxy:BluePrint{
+	    
+	    private var object:Object?;
+	    
+	    private func before(){
+	        print("Before Proxy call");
+	    }
+	    
+	    func call() {
+	        object = Object();
+	        before();
+	        print("I am Proxy call");
+	        object!.call();
+	        after();
+	    }
+	    
+	    private func after(){
+	        print("After Proxy call");
+	    }
+	}
+
+	var client:BluePrint = Proxy();
+	client.call();
+
+&emsp;&emsp;**代码分析**:`Proxy`类是实现类，`var client:BluePrint = Proxy();`会把`Proxy`实例化，于是`client.call();`会调用`Proxy`类中的`call()`方法，此方法再进行对`Object`类的实例化和方法访问。整个调用过程中都是通过`Proxy`实例化对象控制了对`Object`类的访问。以上代码的输出结果如下：
+
+	Before Proxy call
+	I am Proxy call
+	I am Object call
+	After Proxy call
+
+&emsp;&emsp;**总结**:代理模式能在不方便直接调用一些实现类的时候，提供一个很好的解决方案，这是一种很好的对象访问控制方式。
