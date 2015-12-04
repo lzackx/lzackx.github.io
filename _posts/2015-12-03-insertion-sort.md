@@ -42,7 +42,7 @@ categories: algorithm
 
 	C(min) = n - 1	    //进行了（n - 1）次的比较(Compare)
 	
-	M(min) = 0	    //没有进行交换动作(Move)
+	M(min) = 0	        //没有进行交换动作(Move)
 
 2. 需要全排序的一组数据
 
