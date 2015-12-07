@@ -55,13 +55,13 @@ categories: algorithm
 	        array[position1] = standard;
 	        
 	        //将以standard为标准分为两部分的数据集合以递归的方式再次进行遍历，直至遇到不符合(front < back)条件位置
-	        quickSort(&array, front: front, back: (position1 - 1));
-	        quickSort(&array, front: (position1 + 1), back: back);
+	        quickSort(&array, front: front, back: (position1 - 1));    //前半部分
+	        quickSort(&array, front: (position1 + 1), back: back);     //后半部分
 	    }
 	}
 
 	var a:[Int] = [0,2,4,6,8,9,7,5,3,1];         //[0, 2, 4, 6, 8, 9, 7, 5, 3, 1]
-	quickSort(&a, front: 0, back: (a.count - 1));//[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+	quickSort(&a, front: 0, back: (a.count - 1));//[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]    //count－1才是末位下标
 
 快速排序算法时间复杂度（推导公式过于繁杂，有空再补）：
 
