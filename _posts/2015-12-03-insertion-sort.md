@@ -16,8 +16,8 @@ categories: algorithm
 	func insertionSort(inout array:[Int]){
 	    
 	    /*
-	    **  i:          用于表示无序子集的下标
-	    **  j:          用于表示有序子集的下标
+	    **  i:  用于表示无序子集的下标
+	    **  j:  用于表示有序子集的下标
 	    */
 	    var i:Int,j:Int;
 	    var exchange:Int;
