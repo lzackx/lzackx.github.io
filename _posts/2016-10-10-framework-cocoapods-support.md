@@ -123,8 +123,10 @@ CocoaPods的issue中提到过这问题，说是还想支持Xcode 7的版本，Xc
 
 假如没有，就执行如下命令来创建:
 
-`cd ~/.cocoapods/repos`
-`git clone https://github.com/CocoaPods/Specs.git master`
+```
+cd ~/.cocoapods/repos
+git clone https://github.com/CocoaPods/Specs.git master
+```
 
 然后，注册CocoaPods的推送资格
 
