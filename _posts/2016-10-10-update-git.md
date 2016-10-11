@@ -4,6 +4,8 @@ title:  "Mac上更新git"
 date:   2016-10-10 09:00:00
 categories: tools
 ---
+**Mac上更新git步骤**
+
 **安装[Homebrew](http://brew.sh/)**
 
 Homebrew是Mac上非常好用套件管理器，如果嫌自己编译获取新版本git麻烦，使用`brew`命令安装需要的命令行工具是个不错的选择。
