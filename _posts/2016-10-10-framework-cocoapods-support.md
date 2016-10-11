@@ -4,6 +4,8 @@ title:  "为Framework添加CocoaPods支持"
 date:   2016-10-10 09:00:00
 categories: Framework
 ---
+**为Framework添加CocoaPods支持的步骤**
+
 **[CocoaPods](https://cocoapods.org/)**
 
 CocoaPods是很受开源社区青睐的Xcode集成开源Framework的管理工具，开源社区很多开源Framework基本都支持通过以下方式进行集成
