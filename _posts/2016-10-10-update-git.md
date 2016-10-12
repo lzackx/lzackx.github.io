@@ -24,6 +24,8 @@ git这轻量的版本管理工具，基本开发者都知道。
 
 `which git`
 
+貌似`brew`说2016后不允许用`sudo`来执行，那么`brew`不能升权限执行，那就把需要执行的位置降低权限`sudo chown -R $USER:admin /usr/local`，
+
 卸载git:
 
 `brew uninstall git`
