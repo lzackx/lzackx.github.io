@@ -103,7 +103,7 @@ CocoaPods是支持Swift 3.0的Framework的，但要做一点额外的工作
 对于Framework是swift 3.0写的源码，还得在仓库根目录(例如SwiftyRoutes例子的是:`~/Work/Repositories/SwiftyRoutes`)添加一个`.swift-version`文件，
 文件内容就是`3.0`。
 
-*3)Warning: Always Embeded Swifty Library*
+*3)Warning: Always Embed Swift Standard Library*
 
 这里顺便说一下这个问题，Xcode 8有时候`pod install`后会出现这个警告(例如集成EaseMob的库)，这个是没办法的事情，强迫症也得忍一忍，
 CocoaPods的issue中提到过这问题，说是还想支持Xcode 7的版本，Xcode智能地警告你需在target里添加这个字段，其实不加也应该没问题。
