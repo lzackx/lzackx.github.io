@@ -96,8 +96,7 @@ CocoaPods是支持Swift 3.0的Framework的，但要做一点额外的工作
 添加[Ruby China](https://ruby-china.org/)这个源`gem source -a https://gems.ruby-china.org`，然后再更新pod工具。
 
 另外还有，如果很早以前安装过`gem`，那不得不还要额外做一些事情来避免`Operation not permitted`的发生。
-貌似`gem`说2016后不允许用`sudo`来执行，那么`gem`不能升权限执行，那就把需要执行的位置降低权限`sudo chown -R $USER:admin /usr/local`，
-然后通过`gem install -n /usr/local/bin cocoapods`指定位置来更新。
+然后通过`gem install -n /usr/local/bin cocoapods --pre`指定位置来更新。
 
 *2).swift-version文件*:
 
