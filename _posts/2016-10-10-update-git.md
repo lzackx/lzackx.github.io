@@ -2,7 +2,7 @@
 layout: post
 title:  "Mac上更新git"
 date:   2016-10-10 09:00:00
-categories: tools
+categories: Tools
 ---
 **Mac上更新git步骤**
 

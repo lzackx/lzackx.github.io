@@ -2,7 +2,7 @@
 layout: post
 title:  "原型模式：设计模式系列（十八）"
 date:   2015-11-19 00:00:00
-categories: pattern
+categories: Pattern
 ---
 &emsp;&emsp;**原型模式（Prototype Pattern）**:是指定实现类原型，拷贝自身来创建实例对象的设计模式，归类为创建型模式。
 

@@ -2,7 +2,7 @@
 layout: post
 title:  "装饰模式：设计模式系列（十）"
 date:   2015-11-11 00:00:00
-categories: pattern
+categories: Pattern
 ---
 &emsp;&emsp;**装饰模式（Decorator Pattern）**:是把一实体对象类抽象出来的父类或接口或协议由另一接口或协议封装起来，在不改变实际对象的方法与属性的情况下，扩展实体对象类的功能的设计模式，归类为结构型模式。
 

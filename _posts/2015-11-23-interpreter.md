@@ -2,7 +2,7 @@
 layout: post
 title:  "解释器模式：设计模式系列（二十二）"
 date:   2015-11-23 00:00:00
-categories: pattern
+categories: Pattern
 ---
 &emsp;&emsp;**解释器模式（Interpreter Pattern）**:是一种用来对自定义语言语法进行解释的设计模式，归类为行为型模式。
 

@@ -2,7 +2,7 @@
 layout: post
 title:  "享元模式：设计模式系列（十四）"
 date:   2015-11-15 00:00:00
-categories: pattern
+categories: Pattern
 ---
 &emsp;&emsp;**享元模式（Flyweight Pattern）**:是一种防止细粒度对象被大量复用的设计模式，归类为结构型模式。
 

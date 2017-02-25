@@ -2,7 +2,7 @@
 layout: post
 title:  "插入排序：算法系列（三）"
 date:   2015-12-03 09:00:00
-categories: algorithm
+categories: Algorithm
 ---
 **插入排序（Insertion Sort）算法步骤**
 

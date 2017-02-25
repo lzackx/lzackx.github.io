@@ -2,7 +2,7 @@
 layout: post
 title:  "组合模式：设计模式系列（十六）"
 date:   2015-11-17 00:00:00
-categories: pattern
+categories: Pattern
 ---
 &emsp;&emsp;**组合模式（Composite Pattern）**:是一种让实例对象关系按照树形图结构进行关联的设计模式，归类为结构型模式。
 

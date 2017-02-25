@@ -2,7 +2,7 @@
 layout: post
 title:  "MVC架构模式杂谈"
 date:   2015-10-23 00:00:00
-categories: architecture
+categories: Architecture
 ---
 &emsp;&emsp;model－view－controller是MVC的缩写，自从二十世纪八十年代被发明出来之后到现在，想必每一个为应用编程的Coder都有一定的认知，而经过这么多年的发展，对于一种从实际开发中抽象出来的代码设计思想，在没有标准的情况下，其定义也是模糊不清的，于是也衍生出例如MVVM、MVP和一些MVC的变种。
 

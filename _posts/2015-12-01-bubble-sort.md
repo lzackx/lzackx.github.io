@@ -2,7 +2,7 @@
 layout: post
 title:  "冒泡排序：算法系列（一）"
 date:   2015-12-01 09:00:00
-categories: algorithm
+categories: Algorithm
 ---
 **冒泡排序（Bubble Sort）算法步骤**
 

@@ -2,7 +2,7 @@
 layout: post
 title:  "单例模式：设计模式系列（一）"
 date:   2015-11-02 00:00:00
-categories: pattern
+categories: Pattern
 ---
 &emsp;&emsp;**单例模式（Singleton Pattern）**是让一个类确保只有一个实例，并能向全局提供这个实例的访问方法的设计模式，归类为创建型模式。
 

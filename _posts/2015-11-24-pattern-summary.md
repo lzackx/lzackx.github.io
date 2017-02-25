@@ -2,7 +2,7 @@
 layout: post
 title:  "设计模式系列总结"
 date:   2015-11-24 09:00:00
-categories: pattern
+categories: Pattern
 ---
 &emsp;&emsp;面向对象设计模式已经写完（工厂与抽象工厂写在了一起），写的时候都是通过自己的理解没有照搬书本，示例代码都是基于Swift语言写的。
 

@@ -2,7 +2,7 @@
 layout: post
 title:  "选择排序：算法系列（四）"
 date:   2015-12-04 09:00:00
-categories: algorithm
+categories: Algorithm
 ---
 **选择排序（Selection Sort）算法步骤**
 

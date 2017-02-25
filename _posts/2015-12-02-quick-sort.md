@@ -2,7 +2,7 @@
 layout: post
 title:  "快速排序：算法系列（二）"
 date:   2015-12-02 09:00:00
-categories: algorithm
+categories: Algorithm
 ---
 **快速排序（Quick Sort）算法步骤**
 
