@@ -4,13 +4,13 @@ title:  "filter、map、reduce"
 date:   2017-03-25 09:00:00
 categories: Data
 ---
-** 介绍 **
+**介绍**
 
 &emsp;&emsp;对于数据，不同的语言都有异曲同工的处理方式，比较直观的就是使用控制流和循环语句，将有同一处理需求的数据按照一定的规则进行处理，从而得到一定规则的数据。但这对于常常需要进行数据操作的人来说，一些常用的数据处理方式往往需要重复使用，于是便出现了像`filter`、`map`、`reduce`这种灵活通用的数据处理方法，并且可以发现，这三个处理，在多种语言中都有提供，如Swift、Python、Javascript等等。
 
 &emsp;&emsp;那么，这里将以Swift为例阐述`filter`、`map`、`reduce`这三种处理。
 
-** filter **
+**filter**
 
 &emsp;&emsp;从名字来看，`filter`就是过滤的意思。定义如下：
 
@@ -44,7 +44,7 @@ let filter3 = array.filter{_ in true}
 
 &emsp;&emsp;从栗子中的`filter1`中，基本已经可以看出`filter`处理的方式了，而`filter2`、`filter3`则是非常方便的`closure`表达式简写了过滤条件。
 
-** map **
+**map**
 
 &emsp;&emsp;从名字来看，`map`就是映射的意思。定义如下：
 
@@ -71,7 +71,7 @@ let map2 = array.map{"\($0)"}
 
 &emsp;&emsp;从栗子中的`map1`中，可以看出`map`处理的方式，`closure`中的返回值被定义为`String`了，并在`closure`进行了`Element`类型的转换，所以在这里可以理解为把数字类型的数据转换成字符类型的数据。
 
-** reduce **
+**reduce**
 
 &emsp;&emsp;单从名字来看，这个处理方法有点难理解，`reduce`其实是把`Array`内的`Element`个数减少、降低的意思。定义如下：
 
@@ -98,7 +98,7 @@ let reduce2 = array.reduce(String()) {$0 + "\($1)"}
 
 &emsp;&emsp;从栗子中的`reduce1`中，可以想象`reduce`的处理方式，`String()`把`Result`泛型定义为`String`类型，之后`Element`定义为名为`data`的`Int`参数，在`closure`中通过反复转换类型并把其值传入闭包返回值`Result`中，最终的返回值就是最终的`Result`返回值。
 
-** 总结 **
+**总结**
 
 &emsp;&emsp;通过上面的几个栗子，应能明白这三种数据处理方式，而对于这些处理数据的返回值，亦可互相组合使用，从而产生更灵活的处理，在一些语言中，也是有更高级的处理方式，例如Swift，还会有类似如下的用法：
 
