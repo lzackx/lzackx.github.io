@@ -60,19 +60,11 @@ $$P(X=a|Y=b)=\frac{P(X=a,Y=b)}{P(Y=b)}=\frac{P(Y=b|X=a)P(X=a)}{P(Y=b)}$$
 
 &emsp;&emsp;独立性：现假设有随机变量X、Y互相独立，则会有以下性质：
 
-1. 
-
 $$P(X=a|Y=b)=P(X=a|Y=\bar{b})$$
-
-2. 
 
 $$P(X=a|Y=b)=P(X=a)$$
 
-3. 
-
 $$P(X=a,Y=b):P(X=a,Y=\bar{b})=P(X=\bar{a},Y=b):P(X=\bar{a},Y=\bar{b})$$
-
-4. 
 
 $$P(X=a,Y=b)=P(X=a)P(Y=b)$$
 
