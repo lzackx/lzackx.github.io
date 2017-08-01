@@ -92,8 +92,6 @@ $$P_{n}^{k}=\frac{n!}{(n-k)!}$$
 
 $$C_{n}^{k}=\frac{P_{n}^{k}}{k!}=\frac{n!}{k!(n-k)!}$$
 
-&emsp;&emsp;期望：
-
 ## **连续值的概率分布**
 
 to be continue...
