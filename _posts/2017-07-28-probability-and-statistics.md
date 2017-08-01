@@ -1,10 +1,10 @@
 ---
 layout: post
-title:  "概率与统计（Probability and Statistics）"
+title:  "概率与统计（Probability and Statistics）持续更新"
 date:   2017-07-28 09:00:00
 categories: Methodology
 ---
-## **概率与统计（Probability and Statistics）**
+**概率与统计（Probability and Statistics）**
 
 &emsp;&emsp;概率与统计的篇章比较长，分为以下章节：
 
@@ -16,7 +16,7 @@ categories: Methodology
 
 &emsp;&emsp;对于人类视觉，事件是不确定的，这便是概率。
 
-&emsp;&emsp;随机变量在上帝视觉中，其值是确定的；在人类视觉中，其值的出现是概率性的。
+&emsp;&emsp;随机变量在上帝视觉中，是一个确定的函数；在人类视觉中，其值的出现是概率性的。
 
 #### **概率分布**
 
@@ -72,7 +72,33 @@ $$P(X=a,Y=b)=P(X=a)P(Y=b)$$
 
 &emsp;&emsp;当出现多个随检变量（如X,Y,Z,U,V,W...）的概率分布计算时，条件（`|`）的优先级比联合（`,`）高。
 
+## **离散值的概率分布**
 
+#### **二项分布**
 
+&emsp;&emsp;二项分布：是无序的、基于离散值的、描述发生次数的、随机变量相互独立的一种概率分布。（可与正态分布进行联系，正态分布将在连续值的概率分布章节展开）
 
+&emsp;&emsp;设触发一个按钮发生A事件的概率为`p`，不发生A事件的概率为`q`，求重复触发这个按钮`n`次，事件A发生`k`次的概率分布，定义公式如下：
+
+$$P(X=k)=C_{n}^{k}p^{k}q^{n-k}$$
+
+&emsp;&emsp;顺带补充排列与组合的公式
+
+&emsp;&emsp;排列（有序）公式如下：
+
+$$P_{n}^{k}=\frac{n!}{(n-k)!}$$
+
+&emsp;&emsp;组合（无序）公式如下：
+
+$$C_{n}^{k}=\frac{P_{n}^{k}}{k!}=\frac{n!}{k!(n-k)!}$$
+
+&emsp;&emsp;期望：
+
+## 连续值的概率分布
+
+to be continue...
+
+## 协方差矩阵、多元正太分布与椭圆
+
+to be continue...
 
