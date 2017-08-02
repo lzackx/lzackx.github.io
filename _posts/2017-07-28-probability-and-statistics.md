@@ -60,11 +60,19 @@ $$P(X=a|Y=b)=\frac{P(X=a,Y=b)}{P(Y=b)}=\frac{P(Y=b|X=a)P(X=a)}{P(Y=b)}$$
 
 &emsp;&emsp;独立性：现假设有随机变量X、Y互相独立，则会有以下性质：
 
+1
+
 $$P(X=a|Y=b)=P(X=a|Y=\bar{b})$$
+
+2
 
 $$P(X=a|Y=b)=P(X=a)$$
 
+3
+
 $$P(X=a,Y=b):P(X=a,Y=\bar{b})=P(X=\bar{a},Y=b):P(X=\bar{a},Y=\bar{b})$$
+
+4
 
 $$P(X=a,Y=b)=P(X=a)P(Y=b)$$
 
@@ -165,12 +173,18 @@ $$
 
 &emsp;&emsp;方差的性质：
 
+1
+
 $$
 V[X]=E[(X-\mu)^2]=0\\
 \Rightarrow P(X=\mu)=1
 $$
 
+2
+
 $$V[X+c]=E[((x+c)-(\mu+c))^{2}]=E[(x-\mu)^2]=V[X]$$
+
+3
 
 $$
 V[cX]=E[(cx-c\mu)^{2}]\\
@@ -178,6 +192,8 @@ V[cX]=E[(cx-c\mu)^{2}]\\
 =c^{2}E[(x-\mu)^{2}]\\
 =c^{2}V[X]
 $$
+
+4
 
 $$
 E[X]=\mu,V[X]=\sigma^{2},Z=X-\mu\\
@@ -190,6 +206,8 @@ E[X]=\mu,V[X]=\sigma^{2},Z=X-\mu\\
 =\sigma^{2}+\mu^{2}\\
 \Rightarrow V[X]=E[X^{2}]+E[x]^{2}
 $$
+
+5
 
 $$
 P(X,Y)=P(X)P(Y)\\
