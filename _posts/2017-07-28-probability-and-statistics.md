@@ -192,7 +192,7 @@ E[X]=\mu,V[X]=\sigma^{2},Z=X-\mu\\
 $$
 
 $$
-\because P(X,Y)=P(X)P(Y)\\
+P(X,Y)=P(X)P(Y)\\
 \Rightarrow V[X+Y]=E[((X+Y)-(\mu - \nu))^{2}]\\
 =E[((X-\mu)+(Y-\nu))^{2}]\\
 =E[(X-\mu)^{2}+(Y-\nu)^2+2(X-\mu)(Y-\nu)]\\
