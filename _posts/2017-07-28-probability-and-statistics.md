@@ -218,6 +218,23 @@ P(X,Y)=P(X)P(Y)\\
 =V[X]+V[Y]
 $$
 
+#### **标准差（Standard Deviation）**
+
+&emsp;&emsp;标准差，是由于方差与实际值单位不一致，无法进行比较而进行的一种让方差开方，致使其值能与实际值进行分析的度量。
+
+&emsp;&emsp;标准差的公式如下：
+
+$$\sigma=\sqrt{V[X]}$$
+
+&emsp;&emsp;标准化，是种将`E[X]=0`，`V[X]=1`的转换处理。标准化的转换公式可以如下推导：
+
+$$
+W=aX+b(a>0)\\
+\Rightarrow E[W]=0=a\mu+b\\
+\Rightarrow V[W]=1=a^{2}\sigma^{2}\\
+\Rightarrow a=\frac{1}{\sigma},b=-\frac{\mu}{\sigma}
+$$
+
 ## **连续值的概率分布**
 
 to be continue...
