@@ -94,9 +94,23 @@ $$C_{n}^{k}=\frac{P_{n}^{k}}{k!}=\frac{n!}{k!(n-k)!}$$
 
 &emsp;&emsp;二项分布的期望，分为两种情况，即随机变量是否互相独立。当随机变量非互相独立时，需要展开累加计算；若为互相独立，则可以结合期望的性质通过如下计算出二项分布的期望值：
 
-$$E[X]=E[Z_{1}+...+Z_{n}]=E[Z_{1}]+...+E[Z_{n}]=p+...+p=np$$
+$$
+E[X]=E[Z_{1}+...+Z_{n}]\\
+=E[Z_{1}]+...+E[Z_{n}]\\
+=p+...+p=np
+$$
 
-#### **期望**
+&emsp;&emsp;二项分布的方差，同样分为两种情况，即随机变量是否互相独立。当随机变量非互相独立时，需要展开累加计算；若为互相独立，则可以结合方差的性质通过如下计算出二项分布的方差：
+
+$$
+\Rightarrow V[X]=V[Z_{1}]+...+V[Z_{n}],p=1,q=0\\
+\Rightarrow V[Z_{t}]=E[(Z_{t}-p)^{2}]\\
+=(1-p)^{2}p+(0-p)^{2}q=q^{2}p+p^{2}q\\
+=pq(q+p)\\
+=pq
+$$
+
+#### **期望（Expectation）**
 
 &emsp;&emsp;期望：在上帝视觉中，概率是面积问题的基础上，以概率事件的实质事件值为高，那么期望便是体积。
 
@@ -126,11 +140,65 @@ $$E[XY]=\sum_{a}\sum _{b}(f(X=a)\cdot f(Y=b))P(X=a,Y=b)$$
 
 &emsp;&emsp;当随机变量X与Y相互独立时，由概率相互独立的公式可得：
 
-$$E[XY]=\sum_{a}\sum _{b}(f(X=a)\cdot f(Y=b))P(X=a,Y=b)\\=\sum_{a}\sum _{b}(f(X=a)\cdot f(Y=b))P(X=a)P(Y=b)\\=\sum_{a}f(X=a)P(X=a)\cdot \sum _{b}f(Y=b)P(Y=b)\\=E[X]\cdot E[Y]$$
+$$
+E[XY]=\sum_{a}\sum _{b}(f(X=a)\cdot f(Y=b))P(X=a,Y=b)\\
+=\sum_{a}\sum _{b}(f(X=a)\cdot f(Y=b))P(X=a)P(Y=b)\\
+=\sum_{a}f(X=a)P(X=a)\cdot \sum _{b}f(Y=b)P(Y=b)\\
+=E[X]\cdot E[Y]
+$$
 
 &emsp;&emsp;另外，当随机变量Y，是以随机变量X作条件时，有以下公式：
 
 $$E[Y|X=a]=\sum_{b}f(Y=b)P(Y=b|X=a)$$
+
+#### **方差（Variance）**
+
+&emsp;&emsp;方差，是描述期望值的离散程度的一项量值，由于实际值与期望的差的绝对值在计算过程中并步方便，所以在描述变差时，往往使用方差。
+
+&emsp;&emsp;方差的定义公式如下：
+
+$$
+E[X]=\mu\\
+V[X]=E[(X-\mu)^{2}]\\
+=\sum_{a}(a-\mu)^{2}P(X=a)
+$$
+
+&emsp;&emsp;方差的性质：
+
+$$
+V[X]=E[(X-\mu)^2]=0\\
+\Rightarrow P(X=\mu)=1
+$$
+
+$$V[X+c]=E[((x+c)-(\mu+c))^{2}]=E[(x-\mu)^2]=V[X]$$
+
+$$
+V[cX]=E[(cx-c\mu)^{2}]\\
+=E[c^{2}(x-\mu)^{2}]\\
+=c^{2}E[(x-\mu)^{2}]\\
+=c^{2}V[X]
+$$
+
+$$
+E[X]=\mu,V[X]=\sigma^{2},Z=X-\mu\\
+\Rightarrow E[Z]=0,X=Z+\mu\\
+\Rightarrow E[X^{2}]=E[(Z+\mu)^{2}]\\
+=E[Z^{2}+\mu^{2}+2\mu Z]\\
+=E[Z^{2}]+\mu^{2}+2\mu E[Z]\\
+=E[Z^{2}]+\mu^{2}\\
+=E[(X-\mu)^{2}]+\mu^{2}\\
+=\sigma^{2}+\mu^{2}\\
+\Rightarrow V[X]=E[X^{2}]+E[x]^{2}
+$$
+
+$$
+\because P(X,Y)=P(X)P(Y)\\
+\Rightarrow V[X+Y]=E[((X+Y)-(\mu - \nu))^{2}]\\
+=E[((X-\mu)+(Y-\nu))^{2}]\\
+=E[(X-\mu)^{2}+(Y-\nu)^2+2(X-\mu)(Y-\nu)]\\
+=E[(X-\mu)^{2}]+E[(Y-\nu)^{2}]\\
+=V[X]+V[Y]
+$$
 
 ## **连续值的概率分布**
 
