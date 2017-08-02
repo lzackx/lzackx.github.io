@@ -155,7 +155,7 @@ E[XY]=\sum_{a}\sum _{b}(f(X=a)\cdot f(Y=b))P(X=a,Y=b)\\
 =E[X]\cdot E[Y]
 $$
 
-&emsp;&emsp;另外，当随机变量Y，是以随机变量X作条件时，有以下公式：
+&emsp;&emsp;另外，当随机变量Y，是以随机变量X作条件时，有以下公式（可用于最小二乘法）：
 
 $$E[Y|X=a]=\sum_{b}f(Y=b)P(Y=b|X=a)$$
 
@@ -234,6 +234,36 @@ W=aX+b(a>0)\\
 \Rightarrow V[W]=1=a^{2}\sigma^{2}\\
 \Rightarrow a=\frac{1}{\sigma},b=-\frac{\mu}{\sigma}
 $$
+
+#### **大数定律**
+
+&emsp;&emsp;独立同分布（independent and identically，i.i.d.)，即对于一个事件，无论发生多少次，每次随机变量互相独立且概率分布相同的分布。
+
+&emsp;&emsp;平均值的期望值（符合i.i.d.）：
+
+$$
+Z=\frac{X_{1}+...+X_{n}}{n}\\
+\Rightarrow E[Z]\\
+=E[\frac{X_{1}+...+X_{n}}{n}]\\
+=\frac{E[X_{1}+...+X_{n}]}{n}\\
+=\frac{E[X_{1}]+...+E[X_{n}]}{n}\\
+=\frac{n\mu}{n}\\
+=\mu
+$$
+
+&emsp;&emsp;平均值的方差（符合i.i.d.）：
+
+$$
+Z=\frac{X_{1}+...+X_{n}}{n}\\
+\Rightarrow V[Z]\\
+=V[\frac{X_{1}+...+X_{n}}{n}]\\
+=\frac{V[X_{1}+...+X_{n}]}{n^{2}}\\
+=\frac{V[X_{1}]+...+V[X_{n}]}{n^{2}}\\
+=\frac{n\sigma^{2}}{n^{2}}\\
+=\frac{\sigma^{2}}{n}
+$$
+
+&emsp;&emsp;从平均值的期望值与方差公式可以发现，当`n`趋向于无穷时，期望值不变，方差收敛趋向于0。
 
 ## **连续值的概率分布**
 
