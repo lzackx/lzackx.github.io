@@ -267,9 +267,39 @@ $$
 
 ## **连续值的概率分布**
 
-to be continue...
+#### **累积分布函数 & 概率密度函数**
 
-## **协方差矩阵、多元正太分布与椭圆**
+&emsp;&emsp;和离散值不同的是，连续值可以对数值进行无穷细分，即趋向于0而不等于0，所以在计算上，需要使用微分、积分。连续值的概率分布无法做到像离散值那样使用列表显示，需要以公式进行表达，称为累计分布函数，表示的是随机变量X在范围内的概率分布，如下：
 
-to be continue...
+$$F_{X}(a)=P(X\leqslant a)$$
+
+&emsp;&emsp;对累积分布函数进行微分，就能得到概率密度，表示在x加减无穷小的范围内的值的发生概率，如下：
+
+$$f_{X}(x)={F}'_{X}(x)=\frac{\mathrm{d} F_{X}(x)}{\mathrm{d} x}$$
+
+&emsp;&emsp;所以在知道概率密度时，可以反求概率（累积分布函数），即对概率密度函数进行积分计算，如下：
+
+$$P(a\leqslant X\leqslant b)=\int_{a}^{b}f_{X}(x)\mathrm{d}x$$
+
+&emsp;&emsp;结合上述表示，应该明白的是，**概率密度不是概率，但两者可通过微分、积分转化**。
+
+
+#### **均匀分布**
+
+&emsp;&emsp;均匀分布，满足以下两个条件
+
+* 区间内任意值的概率密度（出现的概率）恒定
+* 不会出现区间范围之外的值
+
+$$
+f_{X}(x)=\left\{\begin{matrix}
+\frac{1}{\beta - \alpha }(\alpha \leqslant x\leqslant \beta )\\
+0(x\leqslant \alpha ,x\geqslant \beta )
+\end{matrix}\right.
+$$
+
+
+
+
+
 
