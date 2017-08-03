@@ -293,8 +293,8 @@ $$P(a\leq X\leq b)=\int_{a}^{b}f_{X}(x)\mathrm{d}x$$
 
 $$
 f_{X}(x)=\left\{\begin{matrix}
-\frac{1}{\beta - \alpha }(\alpha \leq x\leq \beta )\\
-0(x\leq \alpha ,x\geqslant \beta )
+\frac{1}{\beta - \alpha }(\alpha \leqslant x\leqslant \beta )\\
+0(x\leqslant \alpha ,x\geq  \beta )
 \end{matrix}\right.
 $$
 
