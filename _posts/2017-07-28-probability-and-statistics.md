@@ -298,6 +298,103 @@ f_{X}(x)=\left\{\begin{matrix}
 \end{matrix}\right.
 $$
 
+#### **变量变换**
+
+&emsp;&emsp;变量变化，即是当随机变量X被另一个随机变量Y等价变换后概率密度函数的变换。如下所示：
+
+$$
+X\rightarrow f_{X},Y\rightarrow f_{Y},Y=aX+b\\
+\Rightarrow X=\frac{Y-b}{a}\\
+\Rightarrow {X}'=\frac{1}{a}\\
+\Rightarrow f_{Y}(y)=\left | \frac{1}{a} \right |\cdot f_{X}(\frac{y-b}{a})\\
+=\left | \frac{f_{X}(x)}{a} \right |\\
+=\left | \frac{f_{X}(\frac{y-b}{a})}{a} \right |
+$$
+
+此时，在获得概率密度函数后，可通过积分计算累积概率函数，如下：
+
+$$
+P(y_{1}\leq y\leq y_{2})=\int_{y_{1}}^{y_{2}}f_{X}(x)\mathrm{d}x\\
+=\int_{y_{1}}^{y_{2}}f_{X}(\frac{y-b}{a})\cdot \frac{\mathrm{d} x}{\mathrm{d} y}\mathrm{d}y
+$$
+
+#### **联合概率、边缘概率、条件概率**
+
+&emsp;&emsp;联合概率、边缘概率、条件概率在连续值中的性质与离散值中的性质相似，就是概率中的**级数运算**转换成概率密度中的**积分运算**。性质如下：
+
+1
+
+$$f_{X}(a)=\int_{-\infty }^{\infty }f_{X,Y}(a,y)\mathrm{d}y$$
+
+2
+
+$$
+f_{Y|X}(b|a)=\frac{f_{X,Y}}{f_{X}(a)}\\
+f_{X,Y}(a,b)=f_{Y|X}(b|a)f_{X}(a)
+$$
+
+3
+
+$$f_{X|Y}(a|b)=\frac{f_{Y|X}(b|a)f_{X}(a)}{\int_{-\infty }^{\infty }f_{Y|X}(b|x)f_{X}(x)\mathrm{d}x}$$
+
+4
+
+$$
+f_{Y|X}(b|a)=f_{Y}(b)\\
+f_{X,Y}(a,b)=f_{X}(a)f_{Y}(b)
+$$
+
+#### **期望、方差、标准差**
+
+&emsp;&emsp;期望、方差、标准差在连续值中的性质与离散值中的性质相似，就是概率中的**级数运算**转换成概率密度中的**积分运算**。性质如下：
+
+1
+
+$$E[X]=\int_{-\infty }^{\infty }xf_{X}(x)\mathrm{d}x$$
+
+2
+
+$$E[g(X)]=\int_{-\infty }^{\infty }g(x)f_{X}(x)\mathrm{d}x$$
+
+3
+
+$$E[h(X,Y)]=\int_{-\infty }^{\infty }\int_{-\infty }^{\infty }h(x,y)f_{X,Y}(x,y)\mathrm{d}x\mathrm{d}x$$
+
+4
+
+$$E[aX+b]=aE[X]+b$$
+
+5
+
+$$V[X]=E[(X-\mu)^{2}],\mu=E[X]$$
+
+6
+
+$$V[aX+b]=a^{2}V[X]$$
+
+7
+
+$$\sigma_{X}=\sqrt{V[X]}$$
+
+8
+
+$$\sigma_{aX+b}=\left | a \right |\sigma_{X}$$
+
+9
+
+$$E[Y|X=a]=\int_{-\infty }^{\infty }yf_{Y}(y|X=a)\mathrm{d}y$$
+
+10
+
+$$V[Y|X=a]=E[(Y-\mu(a))^{2}|X=a]$$
+
+#### **正态分布 & 中心极限定理**
+
+&emsp;&emsp;正态分布（Gauss分布，高斯分布），标准正态分布概率密度函数如下：
+
+$$f(z)=\frac{1}{\sqrt{2\pi}}e^{-\frac{z^{2}}{2}}$$
+
+&emsp;&emsp;中心极限定理，认为正态分布随处可发现，是由误差的叠加引起的。
 
 
 
