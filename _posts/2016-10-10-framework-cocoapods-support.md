@@ -69,34 +69,35 @@ Pod::Spec.new do |s|
 end
 ```
 
-这里不得不说，podspec文件这里有坑，还不少，现在这里能看到的各种字段意思都比较好理解。
-但需要多注意的分别是`version`、`source`、`deployment_target`、`source_files`等
-(还有些没列出，假如Framework需要相关的Bundle文件，那还得注意resources什么的)。
+`podspec`文件的语法可以在[这里](https://guides.cocoapods.org/syntax/podspec.html)查到。
 
-*version*:这个是Framework将会被推到CocoaPods上的版本库说明，需要注意的是Framework项目的Info里要同步这个版本号，
-并且并且并且(重要的话说三遍)，在仓库`commit`后，需要记得出一个对应这个版本号的Release，不然`pod trunk push`的过程，甚至`pod spec lint`都会不成功。
-
-*source*:这个是直接填当前的GitHub相关仓库地址就OK，但是后面的参数则是指定此次push的版本，或许不一定是tag，可能可以是branch什么的，这个具体没试，但应该是这个道理。
-
-*deployment_target*这个是Framework支持的版本号，如果是多平台支持的话，字段可能要添加watchOS什么的，想要支持什么就填什么。
-
-*source_files*这个是核心中的核心，就是这个字段决定了`pod install`后Framework有什么文件被集成到项目中的，
-有些开源Framework喜欢把这些文件放到另开的一个`sources`目录里就是因为这么做方便。此处一定要准确指定对应的源码文件，不然跟不放没区别。
-
-**4. Swift 3.0的支持**
-
-CocoaPods是支持Swift 3.0的Framework的，但要做一点额外的工作
+*备注：CocoaPods对于`xcdatamodeld`文件的处理很奇怪，想动态与静态集成都兼容的话，需要把此文件当成resources且使用手动创建类文件来进行集成*
 
 *1)pod工具*:
 
-这里不得不说，祖国防火墙的强大让开发者走弯路，由于Xcode8.0的发布，如果开发者用的Xcode是8.0的话，pod必须得用`1.1.0.rc.2`这个以上的版本。
+尽量配合Xcode使用较新的`pod`工具。
 
-如果`gem source -l`是`https://rubygems.org/`那么可能被墙，假如是`https://ruby.taobao.org/`那么现在此源(经目前测试)的pod版本只到`1.1.0.beta.2`，
-现在，想要不翻墙获得最新版本，那就`gem sources --remove ***`去掉上面这2个略坑的源，
-添加[Ruby China](https://ruby-china.org/)这个源`gem source -a https://gems.ruby-china.org`，然后再更新pod工具。
+```
+gem source -l
+```
+
+可以查看`gem`源。
+
+默认为：`https://rubygems.org/`
+
+也可以通过以下方式换源（`https://ruby.taobao.org/`、 `https://gems.ruby-china.org`([Ruby China](https://ruby-china.org/))）,再更新pod工具
+
+```
+gem sources --remove xxx
+gem source -a xxx
+```
 
 另外还有，如果很早以前安装过`gem`，那不得不还要额外做一些事情来避免`Operation not permitted`的发生。
-然后通过`gem install -n /usr/local/bin cocoapods --pre`指定位置来更新。
+然后通过以下指定位置来更新。
+
+```
+gem install -n /usr/local/bin cocoapods --pre
+```
 
 *2).swift-version文件*:
 
