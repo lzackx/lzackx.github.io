@@ -89,7 +89,7 @@ CPU的总线由芯片管脚延伸（管脚少的或许可以直接插，但现�
 
 * 平台：iOS
 * 语言：Objective-C
-* 源码地址：[源码](https://github.com/lzackx/Zone/AssemblyLanguage)
+* 源码地址：[源码](https://github.com/lzackx/Zone/tree/master/iOS/AssemblyLanguage)
 
 &emsp;&emsp;*下面是ViewController.m文件*
 ```
@@ -285,7 +285,7 @@ movl   -0x2c(%rbp), %edx
 
 **备注：当参数以入栈的形式传递时，栈中的顺序将变成如下所示的形式，在`bp`保护现场后，`bp`寄存器加出来的获取的变量必定时局部变量，而减出来获得的变量必定是参数**
 
-![CallStack](../images/2018-03-01-assembly-language-call-stack.png)
+![CallStack](https://github.com/lzackx/lzackx.github.io/blob/master/images/2018-03-01-assembly-language-call-stack.png?raw=true)
 
 ##### 3.1.3 返回值
 
