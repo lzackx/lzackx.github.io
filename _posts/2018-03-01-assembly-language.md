@@ -2,7 +2,7 @@
 layout: post
 title:  "汇编语言"
 date:   2018-03-01 09:00:00
-categories: Reverse
+categories: Assembly
 ---
 **汇编语言（Assembly Language）**
 
