@@ -34,7 +34,7 @@ categories: Memory
 
 &emsp;&emsp;具体遵循以下的基础规则：
 
-&emsp;&emsp;**谁创建，谁保留**，使用类似带有`alloc`、`new`、`copy`、`mutableCopy`这些方法创建的对象的对象引用计数加一。
+&emsp;&emsp;**谁创建，谁保留**，使用类似带有`alloc`、`new`、`copy`、`mutableCopy`这些方法创建的对象的对象引用计数加一。（*`new`是C++中的操作符，不但分配内存，还调用构造函数；`alloc`会调用C中的`malloc`函数，仅分配内存，所以可以发现，通常`alloc`后，还要向初始化方法发送信息。*）
 
 
 &emsp;&emsp;**`retain`可使接收者有效保留对象的拥有权**（即引用计数加一），`retain`可以在下面两个情况中使用：
@@ -48,7 +48,7 @@ categories: Memory
 
 ### 1.2 实用性说明
 
-&emsp;&emsp;通过以上的叙述，下面列出比较有代表性的代码，加强认知（代码以MRC的形式运行，显式表达ARC中编译器加插的方法）：
+&emsp;&emsp;通过以上的叙述，下面列出比较有代表性的代码，加强认知（该项目代码以MRC的形式运行，以方便显式表达ARC中编译器加插的方法，若需要单独需要某文件以MRC形式编译，可以在`Compiler Flags`中加上`-fno-objc-arc`）：
 
 ```
 //
@@ -310,6 +310,12 @@ categories: Memory
 
 # 4. 属性（Property）
 
+&emsp;&emsp;这里贴下通过`clang`编译OC代码为C++的命令，方便查看具体实现。
+
+```
+xcrun -sdk iphonesimulator clang -rewrite-objc *.m
+```
+
 &emsp;&emsp;属性的知识点比较零散，示例代码如下：
 
 ```
@@ -454,13 +460,42 @@ block0();
  */
 __block int j = 0;
 void (^block1)(void) = ^{
-    NSLog(@"j is: %i", i);
+    NSLog(@"j is: %i", j);
 };
 
 j = 1;
 
 // 调用后控制台的结果是1
 block1();
+```
+
+通过`clang`编译成C++文件后可以看到如下代码：
+
+```
+static void _I_ViewController_testBlock(ViewController * self, SEL _cmd) {
+    int i = 0;
+    // i在block的实现中使用的是值传递
+    void (*block0)(void) = ((void (*)())&__ViewController__testBlock_block_impl_0((void *)__ViewController__testBlock_block_func_0, &__ViewController__testBlock_block_desc_0_DATA, i));
+
+    i = 1;
+
+
+    ((void (*)(__block_impl *))((__block_impl *)block0)->FuncPtr)((__block_impl *)block0);
+
+
+
+
+
+
+    // j在使用__block声明后，block的实现是传递了地址&j
+    __attribute__((__blocks__(byref))) __Block_byref_j_0 j = {(void*)0,(__Block_byref_j_0 *)&j, 0, sizeof(__Block_byref_j_0), 0};
+    void (*block1)(void) = ((void (*)())&__ViewController__testBlock_block_impl_1((void *)__ViewController__testBlock_block_func_1, &__ViewController__testBlock_block_desc_1_DATA, (__Block_byref_j_0 *)&j, 570425344));
+
+    (j.__forwarding->j) = 1;
+
+
+    ((void (*)(__block_impl *))((__block_impl *)block1)->FuncPtr)((__block_impl *)block1);
+}
 ```
 
 &emsp;&emsp;当然块的作用还有很多，例如充当参数做回掉，又例如充当返回值。
