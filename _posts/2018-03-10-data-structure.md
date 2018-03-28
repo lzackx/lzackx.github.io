@@ -2,7 +2,7 @@
 layout: post
 title:  "数据结构（持续更新）"
 date:   2018-03-10 09:00:00
-categories: Data Structure 
+categories: DataStructure 
 ---
 **数据结构（Data Structure）**
 
