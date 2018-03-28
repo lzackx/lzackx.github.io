@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "概率与统计（Probability and Statistics）持续更新"
+title:  "概率与统计（Probability and Statistics）"
 date:   2017-07-28 09:00:00
 categories: Methodology
 ---
