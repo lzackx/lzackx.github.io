@@ -272,11 +272,309 @@ void array_print(array *a) {
 }
 ```
 
+##### 1.1.2 链表
+
+&emsp;&emsp;链表是一种逻辑上有序，存储上不连续的线性表，在创建数组和增加元素时除了需要注意内存释放问题，最关键的还是需要关注内存和指针的配合使用。
+
+```
+//
+//  list.h
+//  LinearList
+//
+//  Created by lzackx on 2018/3/10.
+//  Copyright © 2018年 lzackx. All rights reserved.
+//
+
+#ifndef list_h
+#define list_h
+
+#include <stdio.h>
+/*
+ .c源码中因经过list_private.h的封装，所以已经有LIST类型的声明，
+ 但在这头文件中，因为有相关函数的声明，所以相应地，在没有宏定义的这个文件中，
+ 可以简单声明，使编译期间不报错，但其实在编译器链接时，起作用的还是私有头文件中的声明。
+ */
+#ifndef LIST
+typedef void list;
+typedef void list_node;
+typedef void * list_node_value;
+#endif
+
+list* list_create(void);
+list_node* list_node_create(list_node_value lnv);
+void list_clear(list *l);
+void list_destory(list *l);
+int list_get_length(list *l);
+list_node* list_node_get(list *l, int index);
+list_node_value list_node_get_value(list_node *ln);
+void list_node_value_insert(list *l, int index, list_node_value *nln);
+void list_node_value_add(list *l, list_node_value *ln);
+void list_node_set(list *l, int index, list_node *nln);
+void list_node_set_value(list_node *ln, list_node_value lnv);
+void list_node_remove(list *l, int index);
+void list_node_value_remove(list *l, list_node_value lnv);
+void list_print(list *l);
+
+#endif /* list_h */
+```
+
+```
+//
+//  list_private.h
+//  LinearList
+//
+//  Created by lzackx on 2018/3/28.
+//  Copyright © 2018年 lzackx. All rights reserved.
+//
+
+/*
+ 这是一个私有头文件，目的是为了封装结构体内的变量，使外部调用时，无法直接访问修改。
+ #define LIST
+ 这个宏是重点。
+ */
+
+#ifndef list_private_h
+#define list_private_h
+
+//typedef void * list_node;
+typedef void * list_node_value;
+
+typedef struct _list_node list_node;
+struct _list_node {
+    
+    list_node_value value;
+    list_node *next;
+    
+};
+
+typedef struct {
+    
+    int length;
+    list_node *header;
+    
+} list;
 
 
+#define LIST
+
+#endif /* list_private_h */
+```
+
+```
+//
+//  list.c
+//  LinearList
+//
+//  Created by lzackx on 2018/3/10.
+//  Copyright © 2018年 lzackx. All rights reserved.
+//
+
+#include "list_private.h"
+#include "list.h"
+#include <stdlib.h>
+#include "string.h"
+
+// 创建
+list* list_create() {
+    
+    list *l = malloc(sizeof(list) + sizeof(list_node));
+    if (l) {
+        l->length = 0;
+        l->header = (list_node *)(l + 1);
+        /*
+         这里有个比容易中但较难发现的坑，初始化时，需要把header内的next指向显式指定为NULL，
+         如果没有这步，因为内存中可能会存在莫名其妙的值，
+         会导致链表的最后一个node的指向认为这个值是个指针，最后访问错误导致crash。
+         */
+        l->header->next = NULL;
+    }
+    return l;
+}
+
+list_node* list_node_create(list_node_value lnv) {
+    
+    list_node *ln = malloc(sizeof(list_node));
+    if (ln == NULL) {
+        return NULL;
+    }
+    ln->next = NULL;
+    ln->value = lnv;
+    return ln;
+}
+
+// 清除
+void list_clear(list *l) {
+    
+    if (l == NULL) {
+        return;
+    }
+    list_node *lhn = l->header;
+    while (lhn) {
+        list_node *lnn = lhn->next;
+        if (lnn == NULL) {
+            break;
+        }
+        lhn->next = lnn->next;
+        free(lnn);
+    }
+    l->length = 0;
+}
+
+// 销毁：链表中，因为存储结构的不连续，导致清除数据需要把每个node都拿出来free掉。
+void list_destory(list *l) {
+    
+    if (l == NULL) {
+        return;
+    }
+    list_clear(l);
+    free(l);
+    l = NULL;
+}
 
 
+// 获取长度
+int list_get_length(list *l) {
+    
+    if (l == NULL) {
+        return 0;
+    }
+    return l->length;
+}
 
+list_node* list_node_get(list *l, int index) {
+    
+    if (l == NULL) {
+        return NULL;
+    }
+    list_node *ln = l->header;
+    for (int i = 0; i < index; i++) {
+        ln = ln->next;
+    }
+    
+    return ln;
+}
+
+list_node_value list_node_get_value(list_node *ln) {
+    
+    if (ln == NULL) {
+        return NULL;
+    }
+    return ln->value;
+}
+
+// 插入：注意指针操作
+void list_node_value_insert(list *l, int index, list_node_value *lnv) {
+    
+    if (l == NULL || index < 0 || index > l->length) {
+        return;
+    }
+
+    list_node *nln = malloc(sizeof(list_node));
+    if (nln == NULL) {
+        return;
+    }
+    nln->next = NULL;
+    nln->value = lnv;
+    
+    list_node *ln = l->header;
+    for (int i = 0;i < index;i++) {
+        ln = ln->next;
+    }
+    nln->next = ln->next;
+    ln->next = nln;
+    l->length += 1;
+}
+
+// 增加：等同于末尾插入
+void list_node_value_add(list *l, list_node_value *lnv){
+    
+    if (l == NULL) {
+        return;
+    }
+    
+    list_node_value_insert(l, l->length, lnv);
+}
+
+// 修改
+void list_node_set(list *l, int index, list_node *nln) {
+    if (l == NULL || nln == NULL) {
+        return;
+    }
+    list_node *ln = l->header;
+    for (int i = 0; i <= index; i++) {
+        ln = ln->next;
+    }
+    nln->next = ln->next;
+    free(ln->next);
+    ln->next = nln;
+}
+
+void list_node_set_value(list_node *ln, list_node_value lnv) {
+    if (ln == NULL) {
+        return;
+    }
+    ln->value = lnv;
+}
+
+// 删除
+void list_node_remove(list *l, int index) {
+    
+    if (l == NULL || l->length <= index || index < 0) {
+        return;
+    }
+    list_node *ln = l->header;
+    for (int i = 0;i < index; i++) {
+        ln = ln->next;
+    }
+    list_node *rln = ln->next;
+    ln->next = rln->next;
+    free(rln);
+    rln = NULL;
+    l->length -= 1;
+}
+
+void list_node_value_remove(list *l, list_node_value lnv) {
+    
+    if (l == NULL || l->length < 0) {
+        return;
+    }
+    
+    list_node *ln = l->header;
+    while (ln) {
+        list_node *lnn = ln->next;
+        if (lnn == NULL) {
+            return;
+        }
+        if (lnn->value == lnv) {
+            ln->next = lnn->next;
+            free(lnn);
+            lnn = NULL;
+            l->length -= 1;
+        } else {
+            ln = lnn;
+        }
+    }
+    
+}
+
+// 打印
+void list_print(list *l) {
+    
+    printf("list\n");
+    printf("{\n");
+    printf("\tlength: %d\n", l->length);
+    printf("\tvalue: [");
+    list_node *ln = l->header;
+    for (int i = 0; i < l->length; i++) {
+        ln = ln->next;
+        printf("%p", (ln->value));
+        if (i < l->length - 1) {
+            printf(",");
+        }
+    }
+    printf("]\n}\n");
+}
+```
 
 
 
