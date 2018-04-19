@@ -76,7 +76,7 @@ CPU的总线由芯片管脚延伸（管脚少的或许可以直接插，但现�
 
 &emsp;&emsp;这里讲解一下比较关键的几个寄存器，如下：
 
-* CS:IP: 代码段寄存器（Code Segment)及（Instruction Pointer）指令指针寄存器，当IP指向某一地址时，此地址内的值即被CPU认为是代码，并通过CPU解析读取并运算。*（CS:IP无法被直接赋值，只能通过类似`jmp`、`call`等指令来控制。
+* CS:IP: 代码段寄存器（Code Segment)及（Instruction Pointer）指令指针寄存器，当IP指向某一地址时，此地址内的值即被CPU认为是代码，并通过CPU解析读取并运算。*（CS:IP无法被直接赋值，只能通过类似`jmp`、`call`、`bl`等指令来控制。
 在寻址能力比较低的时候，为了能获得更强的寻址能力，只用了CS:IP这种形式的寻址方式，现在在寻址能力足够的情况下，可以直接通过IP指向具体地址，减少了与CS的组合。）*
 * DS：数据段寄存器（Data Segment），当某个地址赋值给DS时，此地址加上的值即被CPU认为是数据，可通过增加偏移值进行寻址获取值。
 * SS:SP：堆栈段寄存器（Stack Segment）及栈顶指针（Stack Pointer)，用于物理意义上的入栈出栈（FILO），SP为栈顶指针。*（当SS:SP被指定时，堆栈大小即被指定，SP通过`push`进行入栈，`pop`进行出栈，需要注意栈顶越界问题。）*
@@ -89,6 +89,7 @@ CPU的总线由芯片管脚延伸（管脚少的或许可以直接插，但现�
 * 平台：iOS
 * 语言：Objective-C
 * 源码地址：[源码](https://github.com/lzackx/Zone/tree/master/iOS/AssemblyLanguage)
+* 运行环境：模拟器（即x86_64上，若运行环境为真机，即arm64，可以发现汇编格式会改变为Intel风格）
 
 &emsp;&emsp;*下面是ViewController.m文件*
 ```
@@ -324,6 +325,8 @@ retq
 ##### 3.3.1 外平栈
 
 &emsp;&emsp;在`call`外部入栈后，在`call`的`ret`后，需要把`sp`回到入栈前的地址。
+
+&emsp;&emsp;在ARM64中，链接寄存器`lr`保存了`bl`下一条指令的地址（其实是`pc`执行时，是先把地址加了后再执行当前指令的），当`ret`执行后`pc`指向`lr`指向的地址，从而达到平栈目的。
 
 ##### 3.3.2 内平栈
 
