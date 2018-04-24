@@ -10,7 +10,9 @@ categories: Assembly
 
 1. 汇编
 2. CPU与内存
-3. 汇编例子详解
+3. 汇编例子详解（模拟器）
+4. 汇编例子详解（真机）
+5. 其他
 
 # 1. 汇编
 
@@ -56,13 +58,13 @@ CPU的总线由芯片管脚延伸（管脚少的或许可以直接插，但现�
 &emsp;&emsp;地址总线：宽度决定CPU的寻址能力，与内存相关，例如：地址总线宽度为64，那么寻址能力就是（2^64）那么多。
 
 *备注：内存中，每个单位为1Byte，即8Bit，寻址时，每个地址都是按Byte算的。（1 word = 2 Byte = 16 Bit）
-比较容易理解的例子就是32位时代时，内存最大只能4GB，那是因为32位CPU寻址能力只有4G(2^32)，在这之后就算加上再多的内存，CPU寻址不了，也是没用，而现在64位时代，没有了这种限制*
+比较容易理解的例子就是32位时代时，内存最大只能4GB，那是因为32位CPU寻址能力只有4G(2^32)，在这之后就算加上再多的内存，CPU寻址不了，也是没用，而现在64位时代，没有了这种限制。另外，在ARM64中，对栈的操作是16字节对齐的（可以理解为每个地址指向的数据长度为16Byte，即128Bit）。*
 
 ### 2.2 数据总线
 
 &emsp;&emsp;数据总线：宽度决定CPU单词数据传送量，体现为传送速度。
 
-*备注：各家CPU数据总线都有可能不同，例如：在地址总线宽度为64的情况下，地址总线为32条时，一条完整的数据要分高地位（HL，大端：高低高低，小端：高高低低，大小端知识这里不展开）传送2次；如果地址总线为64条，那么只需要传送1次就可以。这就体现出速度了。*
+*备注：各家CPU数据总线都有可能不同，例如：在地址总线宽度为64的情况下，地址总线为32条时，一条完整的数据要分高低位（HL，大端：高低高低，小端：高高低低，大小端知识这里不展开）传送2次；如果地址总线为64条，那么只需要传送1次就可以。这就体现出速度了。*
 
 ### 2.3 控制总线
 
@@ -76,13 +78,15 @@ CPU的总线由芯片管脚延伸（管脚少的或许可以直接插，但现�
 
 &emsp;&emsp;这里讲解一下比较关键的几个寄存器，如下：
 
-* CS:IP: 代码段寄存器（Code Segment)及（Instruction Pointer）指令指针寄存器，当IP指向某一地址时，此地址内的值即被CPU认为是代码，并通过CPU解析读取并运算。*（CS:IP无法被直接赋值，只能通过类似`jmp`、`call`、`bl`等指令来控制。
+* CS:IP: 代码段寄存器（Code Segment)及（Instruction Pointer）指令指针寄存器，当IP指向某一地址时，此地址内的值即被CPU认为是代码，并通过CPU解析读取并运算。*（CS:IP无法被直接赋值，只能通过类似`jmp`、`call`等指令来控制。
 在寻址能力比较低的时候，为了能获得更强的寻址能力，只用了CS:IP这种形式的寻址方式，现在在寻址能力足够的情况下，可以直接通过IP指向具体地址，减少了与CS的组合。）*
 * DS：数据段寄存器（Data Segment），当某个地址赋值给DS时，此地址加上的值即被CPU认为是数据，可通过增加偏移值进行寻址获取值。
 * SS:SP：堆栈段寄存器（Stack Segment）及栈顶指针（Stack Pointer)，用于物理意义上的入栈出栈（FILO），SP为栈顶指针。*（当SS:SP被指定时，堆栈大小即被指定，SP通过`push`进行入栈，`pop`进行出栈，需要注意栈顶越界问题。）*
 
+&emsp;&emsp;在ARM64中，因各方面的进步，在寻址和计算方面都得到升级，`PC`寄存器的功能与上述的`CS:IP`类似，它指向将被执行的指令地址。现在比较强大的CPU也都基本拥有一级缓存与二级缓存，更加强大的甚至有三级缓存，用于把内存中的指令缓存到处理器中，在处理器需要时以更快的速度处理。另外，想要读懂ARM64中的汇编，`PC`、`SP`、`FP`、`LR`这几个寄存器要结合观察（以A11处理器为例，通过Xcode查看的汇编中，`FP`、`LR`并不能直观看到，因为它们是`x29`、`x30`通用寄存器，但Xcode的`Variable View`是能看到它们的，同样地，也能看到浮点寄存器和向量寄存器等寄存器。）
 
-# 3. 汇编例子详解
+
+# 3. 汇编例子详解（模拟器）
 
 &emsp;&emsp;以上作为讲解的预备知识差不多了，下面将大篇幅根据实际例子进行讲解。（为便于理解，建议分屏跟踪查看）
 
@@ -136,9 +140,10 @@ int function(int a, int b, int c) {
 @end
 ```
 
-&emsp;&emsp;以下汇编皆为在`Debug`的配置下运行。
+&emsp;&emsp;以下汇编皆为在`Debug`的配置下运行。`Release`时，编译器会对代码进行优化，优化等级可在`Build Setting`中设置。
 
-&emsp;&emsp;*下面是viewDidLoad运行时的汇编代码, 为便于讲解，加上了行号*
+&emsp;&emsp;*下面是viewDidLoad在模拟器中运行时的汇编代码, 为便于讲解，加上了行号*
+
 ```
  1 AssemblyLanguage`-[ViewController viewDidLoad]:
  2     0x10867e660 <+0>:   pushq  %rbp
@@ -189,6 +194,7 @@ int function(int a, int b, int c) {
 ```
 
 &emsp;&emsp;*下面是`int function(int a, int b, int c)`函数的汇编代码, 为便于讲解，加上了行号*
+
 ```
  1 AssemblyLanguage`function:
  2     0x10867e5d0 <+0>:  pushq  %rbp
@@ -205,6 +211,7 @@ int function(int a, int b, int c) {
 ```
 
 &emsp;&emsp;*下面是`- (int)methodWithA:(int)a b:(int)b c:(int)c`方法的汇编代码, 为便于讲解，加上了行号*
+
 ```
  1 AssemblyLanguage`-[ViewController methodWithA:b:c:]:
  2     0x10867e5f0 <+0>:  pushq  %rbp
@@ -223,6 +230,7 @@ int function(int a, int b, int c) {
 ```
 
 &emsp;&emsp;*下面是`- (int)methodWithX:(int)x y:(int)y z:(int)z`方法的汇编代码, 为便于讲解，加上了行号*
+
 ```
  1 AssemblyLanguage`-[ViewController methodWithX:y:z:]:
  2     0x10867e620 <+0>:  pushq  %rbp
@@ -326,8 +334,6 @@ retq
 
 &emsp;&emsp;在`call`外部入栈后，在`call`的`ret`后，需要把`sp`回到入栈前的地址。
 
-&emsp;&emsp;在ARM64中，链接寄存器`lr`保存了`bl`下一条指令的地址（其实是`pc`执行时，是先把地址加了后再执行当前指令的），当`ret`执行后`pc`指向`lr`指向的地址，从而达到平栈目的。
-
 ##### 3.3.2 内平栈
 
 &emsp;&emsp;外平栈的做法不适合放在函数内部，因为`ret`前进行`sp`地址操作，会让`ret`取不到`call`前入栈的下一条指令的地址。但可以让`ret`后加地址偏移值来达到这个效果。
@@ -347,7 +353,148 @@ popq   %rbp
 
 &emsp;&emsp;同样的，不止`bp`如此，其他通用寄存器也需要进行入栈出栈的保护操作。
 
-### 3.4 其他
+
+# 4. 汇编例子详解（真机）
+
+### 4.1 汇编示例
+
+&emsp;&emsp;上述同样的代码，运行在真机中时的汇编如下：
+
+&emsp;&emsp;*下面是viewDidLoad在模拟器中运行时的汇编代码, 为便于讲解，加上了行号*
+
+```
+ 1 AssemblyLanguage`-[ViewController viewDidLoad]:
+ 2     0x1043ae700 <+0>:   sub    sp, sp, #0x50             ; =0x50
+ 3     0x1043ae704 <+4>:   stp    x29, x30, [sp, #0x40]
+ 4     0x1043ae708 <+8>:   add    x29, sp, #0x40            ; =0x40
+ 5     0x1043ae70c <+12>:  add    x8, sp, #0x20             ; =0x20
+ 6     0x1043ae710 <+16>:  adrp   x9, 2
+ 7     0x1043ae714 <+20>:  add    x9, x9, #0xc98            ; =0xc98
+ 8     0x1043ae718 <+24>:  adrp   x10, 2
+ 9     0x1043ae71c <+28>:  add    x10, x10, #0xcc0          ; =0xcc0
+10     0x1043ae720 <+32>:  stur   x0, [x29, #-0x8]
+11     0x1043ae724 <+36>:  stur   x1, [x29, #-0x10]
+12     0x1043ae728 <+40>:  ldur   x0, [x29, #-0x8]
+13     0x1043ae72c <+44>:  str    x0, [sp, #0x20]
+14     0x1043ae730 <+48>:  ldr    x10, [x10]
+15     0x1043ae734 <+52>:  str    x10, [sp, #0x28]
+16     0x1043ae738 <+56>:  ldr    x1, [x9]
+17     0x1043ae73c <+60>:  mov    x0, x8
+18     0x1043ae740 <+64>:  bl     0x1043aeb6c               ; symbol stub for: objc_msgSendSuper2
+19     0x1043ae744 <+68>:  orr    w11, wzr, #0x3
+20     0x1043ae748 <+72>:  orr    w12, wzr, #0x2
+21     0x1043ae74c <+76>:  orr    w13, wzr, #0x1
+22     0x1043ae750 <+80>:  str    w13, [sp, #0x1c]
+23     0x1043ae754 <+84>:  str    w12, [sp, #0x18]
+24     0x1043ae758 <+88>:  str    w11, [sp, #0x14]
+25     0x1043ae75c <+92>:  ldr    w0, [sp, #0x1c]
+26     0x1043ae760 <+96>:  ldr    w1, [sp, #0x18]
+27     0x1043ae764 <+100>: ldr    w2, [sp, #0x14]
+28     0x1043ae768 <+104>: bl     0x1043ae648               ; function at ViewController.m:17
+29     0x1043ae76c <+108>: adrp   x8, 2
+30     0x1043ae770 <+112>: add    x8, x8, #0xca0            ; =0xca0
+31     0x1043ae774 <+116>: ldur   x9, [x29, #-0x8]
+32     0x1043ae778 <+120>: ldr    w2, [sp, #0x1c]
+33     0x1043ae77c <+124>: ldr    w3, [sp, #0x18]
+34     0x1043ae780 <+128>: ldr    w4, [sp, #0x14]
+35     0x1043ae784 <+132>: ldr    x1, [x8]
+36     0x1043ae788 <+136>: str    w0, [sp, #0x10]
+37     0x1043ae78c <+140>: mov    x0, x9
+38     0x1043ae790 <+144>: bl     0x1043aeb60               ; symbol stub for: objc_msgSend
+39     0x1043ae794 <+148>: adrp   x8, 2
+40     0x1043ae798 <+152>: add    x8, x8, #0xca8            ; =0xca8
+41     0x1043ae79c <+156>: ldur   x9, [x29, #-0x8]
+42     0x1043ae7a0 <+160>: ldr    w2, [sp, #0x1c]
+43     0x1043ae7a4 <+164>: ldr    w3, [sp, #0x18]
+44     0x1043ae7a8 <+168>: ldr    w4, [sp, #0x14]
+45     0x1043ae7ac <+172>: ldr    x1, [x8]
+46     0x1043ae7b0 <+176>: str    w0, [sp, #0xc]
+47     0x1043ae7b4 <+180>: mov    x0, x9
+48     0x1043ae7b8 <+184>: bl     0x1043aeb60               ; symbol stub for: objc_msgSend
+49     0x1043ae7bc <+188>: str    w0, [sp, #0x8]
+50     0x1043ae7c0 <+192>: ldp    x29, x30, [sp, #0x40]
+51     0x1043ae7c4 <+196>: add    sp, sp, #0x50             ; =0x50
+52     0x1043ae7c8 <+200>: ret    
+```
+
+&emsp;&emsp;*下面是`int function(int a, int b, int c)`函数的汇编代码, 为便于讲解，加上了行号*
+
+```
+ 1 AssemblyLanguage`function:
+ 2     0x1043ae648 <+0>:  sub    sp, sp, #0x10             ; =0x10
+ 3     0x1043ae64c <+4>:  str    w0, [sp, #0xc]
+ 4     0x1043ae650 <+8>:  str    w1, [sp, #0x8]
+ 5     0x1043ae654 <+12>: str    w2, [sp, #0x4]
+ 6     0x1043ae658 <+16>: ldr    w0, [sp, #0xc]
+ 7     0x1043ae65c <+20>: ldr    w1, [sp, #0x8]
+ 8     0x1043ae660 <+24>: add    w0, w0, w1
+ 9     0x1043ae664 <+28>: ldr    w1, [sp, #0x4]
+10     0x1043ae668 <+32>: add    w0, w0, w1
+11     0x1043ae66c <+36>: add    sp, sp, #0x10             ; =0x10
+12     0x1043ae670 <+40>: ret  
+```
+
+&emsp;&emsp;*下面是`- (int)methodWithA:(int)a b:(int)b c:(int)c`方法的汇编代码, 为便于讲解，加上了行号*
+
+```
+ 1 AssemblyLanguage`-[ViewController methodWithA:b:c:]:
+ 2     0x1043ae674 <+0>:  sub    sp, sp, #0x20             ; =0x20
+ 3     0x1043ae678 <+4>:  str    x0, [sp, #0x18]
+ 4     0x1043ae67c <+8>:  str    x1, [sp, #0x10]
+ 5     0x1043ae680 <+12>: str    w2, [sp, #0xc]
+ 6     0x1043ae684 <+16>: str    w3, [sp, #0x8]
+ 7     0x1043ae688 <+20>: str    w4, [sp, #0x4]
+ 8     0x1043ae68c <+24>: ldr    w2, [sp, #0xc]
+ 9     0x1043ae690 <+28>: ldr    w3, [sp, #0x8]
+10     0x1043ae694 <+32>: add    w2, w2, w3
+11     0x1043ae698 <+36>: ldr    w3, [sp, #0x4]
+12     0x1043ae69c <+40>: add    w0, w2, w3
+13     0x1043ae6a0 <+44>: add    sp, sp, #0x20             ; =0x20
+14     0x1043ae6a4 <+48>: ret
+```
+
+&emsp;&emsp;*下面是`- (int)methodWithX:(int)x y:(int)y z:(int)z`方法的汇编代码, 为便于讲解，加上了行号*
+
+```
+ 1 AssemblyLanguage`-[ViewController methodWithX:y:z:]:
+ 2     0x1043ae6a8 <+0>:  sub    sp, sp, #0x30             ; =0x30
+ 3     0x1043ae6ac <+4>:  stp    x29, x30, [sp, #0x20]
+ 4     0x1043ae6b0 <+8>:  add    x29, sp, #0x20            ; =0x20
+ 5     0x1043ae6b4 <+12>: stur   x0, [x29, #-0x8]
+ 6     0x1043ae6b8 <+16>: str    x1, [sp, #0x10]
+ 7     0x1043ae6bc <+20>: str    w2, [sp, #0xc]
+ 8     0x1043ae6c0 <+24>: str    w3, [sp, #0x8]
+ 9     0x1043ae6c4 <+28>: str    w4, [sp, #0x4]
+10     0x1043ae6c8 <+32>: ldr    w0, [sp, #0xc]
+11     0x1043ae6cc <+36>: ldr    w1, [sp, #0x8]
+12     0x1043ae6d0 <+40>: ldr    w2, [sp, #0x4]
+13     0x1043ae6d4 <+44>: bl     0x1043ae648               ; function at ViewController.m:17
+14     0x1043ae6d8 <+48>: ldr    w1, [sp, #0xc]
+15     0x1043ae6dc <+52>: ldr    w2, [sp, #0x8]
+16     0x1043ae6e0 <+56>: add    w1, w1, w2
+17     0x1043ae6e4 <+60>: ldr    w2, [sp, #0x4]
+18     0x1043ae6e8 <+64>: add    w1, w1, w2
+19     0x1043ae6ec <+68>: str    w0, [sp]
+20     0x1043ae6f0 <+72>: mov    x0, x1
+21     0x1043ae6f4 <+76>: ldp    x29, x30, [sp, #0x20]
+22     0x1043ae6f8 <+80>: add    sp, sp, #0x30             ; =0x30
+23     0x1043ae6fc <+84>: ret
+```
+
+### 4.2 与模拟器中运行的区别
+
+&emsp;&emsp;显然，真机(ARM64)与模拟器(x86_64)的汇编区别很大，如下：
+
+* 汇编格式不一样了。
+* ARM64中能改变`pc`寄存器的地址的指令是`b`或`bl`等指令。
+* ARM64中使用`fp`作用与`bp`相同，即：为`sp`记录栈低。
+* 链接寄存器`lr`保存了`bl`下一条指令的地址（其实是`pc`执行时，是先把地址加了后再执行当前指令的），当`ret`执行后`pc`指向`lr`指向的地址，从而达到平栈目的。
+* 函数的参数是存放在`x0`到`x7`(`w0`到`w7`)这8个寄存器里面的.如果超过8个参数，就会入栈。
+* 函数的返回值是放在`x0`寄存器里面的.
+
+**（备注：在A11处理器中，`fp`是`x29`、`lr`是`x30`，汇编代码中没有显式显示寄存器名。利用参数和返回值的存放规律，结合`Runtime`中函数的调用方式，可以从`x0`中获得`self`、从`x1`中获得`_cmd`，并在return后通过`x0`获得返回值）**
+
+# 5. 其他
 
 &emsp;&emsp;这里将补充一些能帮助阅读汇编的小Tips：
 
