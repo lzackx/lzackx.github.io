@@ -85,6 +85,12 @@ CPU的总线由芯片管脚延伸（管脚少的或许可以直接插，但现�
 
 &emsp;&emsp;在ARM64中，因各方面的进步，在寻址和计算方面都得到升级，`PC`寄存器的功能与上述的`CS:IP`类似，它指向将被执行的指令地址。现在比较强大的CPU也都基本拥有一级缓存与二级缓存，更加强大的甚至有三级缓存，用于把内存中的指令缓存到处理器中，在处理器需要时以更快的速度处理。另外，想要读懂ARM64中的汇编，`PC`、`SP`、`FP`、`LR`这几个寄存器要结合观察（以A11处理器为例，通过Xcode查看的汇编中，`FP`、`LR`并不能直观看到，因为它们是`x29`、`x30`通用寄存器，但Xcode的`Variable View`是能看到它们的，同样地，也能看到浮点寄存器和向量寄存器等寄存器。）
 
+&emsp;&emsp;另外，还有一个寄存器`cpsr`（current program status register，当前程序状态寄存器），是一个32位按位标记状态的寄存器，用于存储条件码。其中`adds`、`subs`等指令会影响此寄存器，在分析App的汇编代码时，需要关注最后四位，即28、29、30、31的位数据，分别对应如下：
+
+* 28 Bit，V，溢出标志。溢出时为1，否则为0。
+* 29 Bit，C，进借位标志。加法产生进位时，C=1，反之C=0；减法产生借位时，C=0，反之C=1。
+* 30 Bit，Z，零标志。执行运算后，结果为0时，Z=1，反之Z=0。
+* 31 Bit，N，负数标志。执行运算后，结果为负时，N=1，反之N=0。
 
 # 3. 汇编例子详解（模拟器）
 
@@ -489,7 +495,7 @@ popq   %rbp
 * ARM64中能改变`pc`寄存器的地址的指令是`b`或`bl`等指令。
 * ARM64中使用`fp`作用与`bp`相同，即：为`sp`记录栈低。
 * 链接寄存器`lr`保存了`bl`下一条指令的地址（其实是`pc`执行时，是先把地址加了后再执行当前指令的），当`ret`执行后`pc`指向`lr`指向的地址，从而达到平栈目的。
-* 函数的参数是存放在`x0`到`x7`(`w0`到`w7`)这8个寄存器里面的.如果超过8个参数，就会入栈。
+* 函数的参数是存放在`x0`到`x7`(`w0`到`w7`)这8个寄存器里面的。如果超过8个参数，就会入栈。
 * 函数的返回值是放在`x0`寄存器里面的.
 
 *（备注：在A11处理器中，`fp`是`x29`、`lr`是`x30`，汇编代码中没有显式显示寄存器名。利用参数和返回值的存放规律，结合`Runtime`中函数的调用方式，可以从`x0`中获得`self`、从`x1`中获得`_cmd`，并在return后通过`x0`获得返回值）*
@@ -501,6 +507,25 @@ popq   %rbp
 * Xcode菜单中`Debug`下`Debug Workflow`的`Always Show Disassembly`可让断点触发时查看经过反汇编的汇编指令。
 * 断点时，`register`和`memory`可帮助查看寄存器和内存。
 * 每一条汇编指令执行时，`ip`都会先指向下一条指令的地址，再执行。这一点很重要！在通过偏移地址查内存值时，找下一条汇编指令地址加偏移地址得出的地址，才是指令操作的实际地址！
+* 在通过汇编代码进行静态分析时，遇见`adrp`时，需要连同下一句一起看，同时对于`adrp`指令，从`pc`指向的地址上，进行低12位的0掩码与操作，然后加上左移了12位的页数（一页大小为4KB，所以是12位，2^12，0x1000），即为寻址的目标地址，[ARM架构手册](https://static.docs.arm.com/ddi0487/ca/DDI0487C_a_armv8_arm.pdf)中的描述如下：
+```
+Literal variant
+ADRP <Xd>, <label>
+
+Decode for this encoding
+integer d = UInt(Rd); 
+bits(64) imm;
+imm = SignExtend(immhi:immlo:Zeros(12), 64);
+
+Assembler symbols
+<Xd> Is the 64-bit name of the general-purpose destination register, encoded in the "Rd" field.
+<label> Is the program label whose 4KB page address is to be calculated. Its offset from the page address of this instruction, in the range +/-4GB, is encoded as "immhi:immlo" times 4096.
+
+Operation
+bits(64) base = PC[]; 
+base<11:0> = Zeros(12); 
+X[d] = base + imm;
+```
 * 同一份代码多次运行查看断点后，可以发现，每条指令的后几位都是一样的，那就是偏移地址，而基地值就是前面不同的几位，这是因为现在`ip`的位数足够多，不需要像以前那样需要定义`cs:ip`才能定位到实际地址。
 * 默认状态下，`Release`和`Debug`模式下编译出来的的汇编略有不同，那是因为`Release`下编译时，会被编译器优化，一些比较容易得出的值，会直接得出使用，减少指令数，运行起来就稍微比`Debug`情况下的要快点了。可以在`Build Settings`的`Optimization Level`设置优化等级。
 * Linux系统中，终端输入`uname -m`就可以对查找适合该CPU的汇编风格了。
