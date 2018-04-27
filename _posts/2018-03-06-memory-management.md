@@ -124,7 +124,7 @@ categories: Memory
 - (NSString *)rule {
     
     /*
-     [NSString string]是工程方法，依照规则，它没有保留对象的拥有权，所以没问题。
+     [NSString string]是工厂方法，依照规则，它没有保留对象的拥有权，所以没问题。
      */
     NSString *r = [NSString string];
     
