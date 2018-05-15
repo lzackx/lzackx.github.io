@@ -5,14 +5,14 @@
     background: #fff;
     @extend %vertical-rhythm;
 
-    .c     { color: #998; font-style: italic } // Comment
+    .c     { color: #66ccff; font-style: italic } // Comment
     .err   { color: #a61717; background-color: #e3d2d2 } // Error
     .k     { font-weight: bold } // Keyword
     .o     { font-weight: bold } // Operator
-    .cm    { color: #998; font-style: italic } // Comment.Multiline
-    .cp    { color: #999; font-weight: bold } // Comment.Preproc
-    .c1    { color: #998; font-style: italic } // Comment.Single
-    .cs    { color: #999; font-weight: bold; font-style: italic } // Comment.Special
+    .cm    { color: #66ccff; font-style: italic } // Comment.Multiline
+    .cp    { color: #66ccff; font-weight: bold } // Comment.Preproc
+    .c1    { color: #66ccff; font-style: italic } // Comment.Single
+    .cs    { color: #66ccff; font-weight: bold; font-style: italic } // Comment.Special
     .gd    { color: #000; background-color: #fdd } // Generic.Deleted
     .gd .x { color: #000; background-color: #faa } // Generic.Deleted.Specific
     .ge    { font-style: italic } // Generic.Emph
