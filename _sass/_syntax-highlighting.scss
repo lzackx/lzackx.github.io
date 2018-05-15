@@ -5,14 +5,14 @@
     background: #f7f7f7;
     @extend %vertical-rhythm;
 
-    .c     { color: #ffcc66; font-style: italic } // Comment
+    .c     { color: #66ccff; font-style: italic } // Comment
     .err   { color: #ff66cc; background-color: #e3d2d2 } // Error
     .k     { font-weight: bold } // Keyword
     .o     { font-weight: bold } // Operator
-    .cm    { color: #ffcc66; font-style: italic } // Comment.Multiline
-    .cp    { color: #ffcc66; font-weight: bold } // Comment.Preproc
-    .c1    { color: #ffcc66; font-style: italic } // Comment.Single
-    .cs    { color: #ffcc66; font-weight: bold; font-style: italic } // Comment.Special
+    .cm    { color: #66ccff; font-style: italic } // Comment.Multiline
+    .cp    { color: #66ccff; font-weight: bold } // Comment.Preproc
+    .c1    { color: #66ccff; font-style: italic } // Comment.Single
+    .cs    { color: #66ccff; font-weight: bold; font-style: italic } // Comment.Special
     .gd    { color: #000; background-color: #fdd } // Generic.Deleted
     .gd .x { color: #000; background-color: #faa } // Generic.Deleted.Specific
     .ge    { font-style: italic } // Generic.Emph
@@ -29,19 +29,19 @@
     .kd    { font-weight: bold } // Keyword.Declaration
     .kp    { font-weight: bold } // Keyword.Pseudo
     .kr    { font-weight: bold } // Keyword.Reserved
-    .kt    { color: #66ccff; font-weight: bold } // Keyword.Type
+    .kt    { color: #66ffcc; font-weight: bold } // Keyword.Type
     .m     { color: #66ffcc } // Literal.Number
     .s     { color: #cc66ff } // Literal.String
     .na    { color: #66ffcc } // Name.Attribute
     .nb    { color: #66ffcc } // Name.Builtin
-    .nc    { color: #66ccff; font-weight: bold } // Name.Class
+    .nc    { color: #66ffcc; font-weight: bold } // Name.Class
     .no    { color: #66ffcc } // Name.Constant
     .ni    { color: #66ffcc } // Name.Entity
     .ne    { color: #ff66cc; font-weight: bold } // Name.Exception
     .nf    { font-weight: bold } // Name.Function
     .nn    { color: #66ffcc } // Name.Namespace
     .nt    { color: #66ffcc } // Name.Tag
-    .nv    {  } // Name.Variable
+    .nv    { color: #66ffcc } // Name.Variable
     .ow    { font-weight: bold } // Operator.Word
     .w     { color: #bbb } // Text.Whitespace
     .mf    { color: #66ffcc } // Literal.Number.Float
