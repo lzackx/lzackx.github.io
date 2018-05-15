@@ -102,7 +102,7 @@ CPU的总线由芯片管脚延伸（管脚少的或许可以直接插，但现�
 * 运行环境：模拟器（即x86_64上，若运行环境为真机，即arm64，可以发现汇编格式会改变为Intel风格）
 
 &emsp;&emsp;*下面是ViewController.m文件*
-```
+```objc
 #import "ViewController.h"
 
 
@@ -267,7 +267,7 @@ int function(int a, int b, int c) {
 
 &emsp;&emsp;这里以`viewDidLoad`方法第3、4行的指令为例，即：
 
-```
+```armasm
 movq   %rsp, %rbp
 subq   $0x50, %rsp
 ```
@@ -277,7 +277,7 @@ subq   $0x50, %rsp
 &emsp;&emsp;从这句指令可以发现，它的本质就是把`sp`（栈顶指针）地址减0x50，那么就等于开辟了0x50那么大的栈空间，并且通过第15～17行代码，即如下指令，把局部变量1、2、3赋值到对应空间的内存中。
 这里或许会奇怪，`bp`又是什么鬼？`bp`其实就是基数指针，因为`SS:SP`之间的差值具有表达栈大小的意义，所以在需要读写栈中内存时，需要这个叫`bp`的指针。
 
-```
+```armasm
 movl   $0x1, -0x24(%rbp)
 movl   $0x2, -0x28(%rbp)
 movl   $0x3, -0x2c(%rbp)
@@ -287,7 +287,7 @@ movl   $0x3, -0x2c(%rbp)
 
 &emsp;&emsp;以`viewDidLoad`方法第18～20行的指令为例，即：
 
-```
+```armasm
 movl   -0x24(%rbp), %edi
 movl   -0x28(%rbp), %esi
 movl   -0x2c(%rbp), %edx
@@ -305,7 +305,7 @@ movl   -0x2c(%rbp), %edx
 
 &emsp;&emsp;返回值在汇编中，是比较不起眼的，这里以`function`中第10行中的汇编指令为例，即：
 
-```
+```armasm
 movl   %edx, %eax
 ```
 
@@ -318,7 +318,7 @@ movl   %edx, %eax
 
 &emsp;&emsp;现在以`viewDidLoad`方法内第21行的汇编代码为例，它是调用`function`的一段指令，如下：
 
-```
+```armasm
 callq  0x10867e5d0
 ```
 
@@ -326,7 +326,7 @@ callq  0x10867e5d0
 
 &emsp;&emsp;`0x10867e5d0`这个地址无疑就是`function`函数的入口地址，在该函数调用完毕后，可以看到`function`的最后一行，即如下指令。
 
-```
+```armasm
 retq
 ```
 
@@ -348,7 +348,7 @@ retq
 
 &emsp;&emsp;可以看到基本每个函数或方法，在开始与结束时，都会有相同的指令，如下：
 
-```
+```armasm
 pushq  %rbp
 movq   %rsp, %rbp
 ...
