@@ -32,16 +32,16 @@
     .kt    { color: #66ccff; font-weight: bold } // Keyword.Type
     .m     { color: #66ffcc } // Literal.Number
     .s     { color: #cc66ff } // Literal.String
-    .na    { color: #ccff66 } // Name.Attribute
-    .nb    { color: #ccff66 } // Name.Builtin
+    .na    { color: #66ffcc } // Name.Attribute
+    .nb    { color: #66ffcc } // Name.Builtin
     .nc    { color: #66ccff; font-weight: bold } // Name.Class
-    .no    { color: #ccff66 } // Name.Constant
-    .ni    { color: #ccff66 } // Name.Entity
+    .no    { color: #66ffcc } // Name.Constant
+    .ni    { color: #66ffcc } // Name.Entity
     .ne    { color: #ff66cc; font-weight: bold } // Name.Exception
-    .nf    { color: #ccff66; font-weight: bold } // Name.Function
-    .nn    { color: #ccff66 } // Name.Namespace
-    .nt    { color: #ccff66 } // Name.Tag
-    .nv    { color: #ccff66 } // Name.Variable
+    .nf    { color: #66ffcc; font-weight: bold } // Name.Function
+    .nn    { color: #66ffcc } // Name.Namespace
+    .nt    { color: #66ffcc } // Name.Tag
+    .nv    { color: #66ffcc } // Name.Variable
     .ow    { font-weight: bold } // Operator.Word
     .w     { color: #bbb } // Text.Whitespace
     .mf    { color: #66ffcc } // Literal.Number.Float
@@ -56,12 +56,12 @@
     .sh    { color: #cc66ff } // Literal.String.Heredoc
     .si    { color: #cc66ff } // Literal.String.Interpol
     .sx    { color: #cc66ff } // Literal.String.Other
-    .sr    { color: #ccff66 } // Literal.String.Regex
+    .sr    { color: #66ffcc } // Literal.String.Regex
     .s1    { color: #cc66ff } // Literal.String.Single
-    .ss    { color: #ccff66 } // Literal.String.Symbol
-    .bp    { color: #ccff66 } // Name.Builtin.Pseudo
-    .vc    { color: #ccff66 } // Name.Variable.Class
-    .vg    { color: #ccff66 } // Name.Variable.Global
-    .vi    { color: #ccff66 } // Name.Variable.Instance
+    .ss    { color: #66ffcc } // Literal.String.Symbol
+    .bp    { color: #66ffcc } // Name.Builtin.Pseudo
+    .vc    { color: #66ffcc } // Name.Variable.Class
+    .vg    { color: #66ffcc } // Name.Variable.Global
+    .vi    { color: #66ffcc } // Name.Variable.Instance
     .il    { color: #66ffcc } // Literal.Number.Integer.Long
 }
