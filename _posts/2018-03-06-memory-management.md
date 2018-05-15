@@ -50,7 +50,7 @@ categories: Memory
 
 &emsp;&emsp;通过以上的叙述，下面列出比较有代表性的代码，加强认知（该项目代码以MRC的形式运行，以方便显式表达ARC中编译器加插的方法，若需要单独需要某文件以MRC形式编译，可以在`Compiler Flags`中加上`-fno-objc-arc`）：
 
-```
+```objc
 //
 //  Rule.h
 //  Policy
@@ -70,7 +70,7 @@ categories: Memory
 @end
 ```
 
-```
+```objc
 //
 //  Rule.m
 //  Policy
@@ -177,7 +177,7 @@ categories: Memory
 
 &emsp;&emsp;categories与extension都为类提供了一种可以额外添加功能的方法，两者是相似的，但细节方面又大大的不同。代码如下：
 
-```
+```objc
 //
 //  ViewController.h
 //  CategoryAndExtension
@@ -194,7 +194,7 @@ categories: Memory
 @end
 ```
 
-```
+```objc
 //
 //  ViewControllerPrivate.h
 //  CategoryAndExtension
@@ -216,7 +216,7 @@ categories: Memory
 #endif /* ViewControllerPrivate_h */
 ```
 
-```
+```objc
 //
 //  ViewController.m
 //  CategoryAndExtension
@@ -245,7 +245,7 @@ categories: Memory
 @end
 ```
 
-```
+```objc
 //
 //  UIViewController+Category.h
 //  CategoryAndExtension
@@ -264,7 +264,7 @@ categories: Memory
 @end
 ```
 
-```
+```objc
 //
 //  UIViewController+Category.m
 //  CategoryAndExtension
@@ -290,7 +290,7 @@ categories: Memory
 
 &emsp;&emsp;categories能在不改变原类实现的情况下，添加额外的功能，但正常情况下，并不能添加存储变量（正常情况下不能，但利用运行时的特性，是可以的），categories与原类分离，通常代码文件名以`原类名+category名`这种形式保存，且内部实现的方法最好加上category的前缀作为与原类方法的区分。方法实现与原类相似，但声明格式略有区别，声明格式如下：
 
-```
+```objc
 @interface ClassName (CategoryName)
 
 @end
@@ -300,7 +300,7 @@ categories: Memory
 
 &emsp;&emsp;extension通常用来扩展原类的一些功能，有时也用于限制方法的调用，它能添加存储变量，但与原类是一体的，即在编译时，是与原类一同编译的，所以在编译后，想扩展功能，使用extension就不合适了。方法实现与原类相似，但声明格式也有不同，如下：
 
-```
+```objc
 @interface ClassName ()
 
 @end
@@ -318,7 +318,7 @@ xcrun -sdk iphonesimulator clang -rewrite-objc *.m
 
 &emsp;&emsp;属性的知识点比较零散，示例代码如下：
 
-```
+```objc
 //
 //  Property.h
 //  Property
@@ -359,7 +359,7 @@ xcrun -sdk iphonesimulator clang -rewrite-objc *.m
 @end
 ```
 
-```
+```objc
 //
 //  Property.m
 //  Property
@@ -418,7 +418,7 @@ xcrun -sdk iphonesimulator clang -rewrite-objc *.m
 
 &emsp;&emsp;关于块（block），如下所示：
 
-```
+```objc
 /*
   block可通过类型定义来简化使用，如下
   typedef void (^BlockType)(void);
@@ -440,7 +440,7 @@ xcrun -sdk iphonesimulator clang -rewrite-objc *.m
 
 &emsp;&emsp;使用`__block`的局部变量可以为block提供共享存储的能力，通过以下代码进行解释：
 
-```
+```objc
 int i = 0;
 
 void (^block0)(void) = ^{
@@ -471,7 +471,7 @@ block1();
 
 通过`clang`编译成C++文件后可以看到如下代码：
 
-```
+```cpp
 static void _I_ViewController_testBlock(ViewController * self, SEL _cmd) {
     int i = 0;
     // i在block的实现中使用的是值传递
@@ -515,7 +515,7 @@ static void _I_ViewController_testBlock(ViewController * self, SEL _cmd) {
 
 &emsp;&emsp;在`block`中，一不注意，就很容易出现循环引用的情况。示例代码及解释如下：
 
-```
+```objc
 //
 //  ViewController.m
 //  Reference

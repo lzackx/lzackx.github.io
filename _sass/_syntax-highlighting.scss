@@ -38,10 +38,10 @@
     .no    { color: #66ffcc } // Name.Constant
     .ni    { color: #66ffcc } // Name.Entity
     .ne    { color: #ff66cc; font-weight: bold } // Name.Exception
-    .nf    { color: #66ffcc; font-weight: bold } // Name.Function
+    .nf    { font-weight: bold } // Name.Function
     .nn    { color: #66ffcc } // Name.Namespace
     .nt    { color: #66ffcc } // Name.Tag
-    .nv    { color: #66ffcc } // Name.Variable
+    .nv    {  } // Name.Variable
     .ow    { font-weight: bold } // Operator.Word
     .w     { color: #bbb } // Text.Whitespace
     .mf    { color: #66ffcc } // Literal.Number.Float

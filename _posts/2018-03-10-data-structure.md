@@ -26,7 +26,7 @@ categories: DataStructure
 
 &emsp;&emsp;数组是一种逻辑上有序，存储上连续的线性表，在创建数组和增加元素时注意内存释放问题，在删改查时注意越界问题，总体上就没什么问题了。
 
-```
+```objc
 //
 //  array.h
 //  LinearList
@@ -65,7 +65,7 @@ void array_print(array *a);
 #endif /* array_h */
 ```
 
-```
+```objc
 //
 //  array_private.h
 //  LinearList
@@ -97,7 +97,7 @@ typedef struct {
 #endif /* array_private_h */
 ```
 
-```
+```objc
 //
 //  array.c
 //  LinearList
@@ -276,7 +276,7 @@ void array_print(array *a) {
 
 &emsp;&emsp;链表是一种逻辑上有序，存储上不连续的线性表，在创建数组和增加元素时除了需要注意内存释放问题，最关键的还是需要关注内存和指针的配合使用。
 
-```
+```objc
 //
 //  list.h
 //  LinearList
@@ -318,7 +318,7 @@ void list_print(list *l);
 #endif /* list_h */
 ```
 
-```
+```objc
 //
 //  list_private.h
 //  LinearList
@@ -360,7 +360,7 @@ typedef struct {
 #endif /* list_private_h */
 ```
 
-```
+```objc
 //
 //  list.c
 //  LinearList
