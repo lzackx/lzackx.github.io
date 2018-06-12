@@ -98,7 +98,9 @@ security cms -D -i [Profile_Path]
 &emsp;&emsp;通过一下命令查看原App的权限设置，与自己创建的进行对比修改（为了重签后可以进行调试，可添加`get-task-allow`和`task_for_pid-allow`两个布尔类型的值）。
 
 ```sh
-codesign -d --entitlements [MACH-O_FILE]
+codesign -d --entitlements :- [MACH-O_FILE]
+# 有ldid也可以用这个
+ldid -e [MACH-O_FILE]
 ```
 
 &emsp;&emsp;复制`<key>Entitlements</key>`内的权限内容到一个新的`.plist`文件中。
