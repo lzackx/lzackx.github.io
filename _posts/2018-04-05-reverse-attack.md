@@ -35,7 +35,7 @@ categories: Reverse
 
 &emsp;&emsp;在了解App的加密原理后就会发现，这时会遇到个难题：怎么获得解密后的`Mach-O`文件？就算是已经握在手上的设备中，已经存在的`Apple`公布出来的公钥都拿不到！
 
-&emsp;&emsp;所以，破解加密这种操作是做不到的了，那么就只能出绝招了：越狱。ps:现时，只有9.1以下的iOS系统能完美越狱，更新的版本，听说已有团队做到11.2的越狱，但没证实。
+&emsp;&emsp;所以，破解加密这种操作是做不到的了，那么就只能出绝招了：越狱。ps:现时，只有9.1以下的iOS系统能完美越狱。
 
 &emsp;&emsp;首先，`Mach-O`文件作为可执行文件，它是被`dyld`（存放与/usr/lib/dyld，iOS和macOS都是，代码是开源的，有兴趣可以[看下](https://opensource.apple.com/tarballs/dyld/)）加载到内存中执行的。
 
@@ -55,7 +55,7 @@ categories: Reverse
 
 &emsp;&emsp;动态砸壳，就是利用越狱的设备，向进程注入动态库，利用这个动态库，读取已被`dyld`加载到内存里的数据，dump出已经解密了的`Mach-O`文件（说是砸壳，其实有种提取的味道）。
 
-&emsp;&emsp;目前，最舒适方便的砸壳工具是[AloneMonkey](http://www.alonemonkey.com)的[frida-ios-dump](https://github.com/AloneMonkey/frida-ios-dump)了，介绍：[一条命令完成砸壳](http://www.alonemonkey.com/2018/01/30/frida-ios-dump/)，是用[frida](https://www.frida.re/)做到的，搭好环境后一气呵成。
+&emsp;&emsp;目前，最舒适方便的砸壳工具是[AloneMonkey](http://www.alonemonkey.com)的[frida-ios-dump](https://github.com/AloneMonkey/frida-ios-dump)了，介绍：[一条命令完成砸壳](http://www.alonemonkey.com/2018/01/30/frida-ios-dump/)，是用[frida](https://www.frida.re/)做到的，搭好环境后一气呵成。需要提及的是`frida`有坑，设备运行久了，`frida-server`会挂掉，使用`dump.py`时遇见报错别慌，重启下设备端的`frida-server`能解决大部分问题。
 
 ### 1.3 重签
 
@@ -95,7 +95,7 @@ security find-identity -v -p codesigning
 security cms -D -i [Profile_Path]
 ```
 
-&emsp;&emsp;通过一下命令查看原App的权限设置，与自己创建的进行对比修改（为了重签后可以进行调试，可添加`get-task-allow`和`task_for_pid-allow`两个布尔类型的值）。
+&emsp;&emsp;通过以下命令查看原App的权限设置，与自己创建的进行对比修改（为了重签后可以进行调试，可添加`get-task-allow`和`task_for_pid-allow`两个布尔类型的值）。
 
 ```sh
 codesign -d --entitlements :- [MACH-O_FILE]
