@@ -15,6 +15,7 @@ categories: Framework
 &emsp;&emsp;`CDVViewController.m`如下，实现代码较多，后面以生命周期为线进行梳理（看不过来建议双屏对比查看）。
 
 1. 先看构造函数，对于`UIViewController`的各个构造函数，类中都调用同一个方法`__init`，在做一些初始化属性的操作外，也用通知中心对App的生命周期做了监听，这些监听也同时做了能让Web中相应App生命周期的通知。
+
 ```ObjC
 - (void)__init
 {
@@ -65,6 +66,7 @@ categories: Framework
     return self;
 }
 ```
+
 2. 然后是`viewDidLoad`中对整个网页与原生交互的初始化
    1. 通过`[self loadSettings]`加载配置
       1. 优先寻找`configFile`属性指向的文件名，若无，默认取`config.xml`文件
@@ -72,6 +74,7 @@ categories: Framework
     1. 通过`[self createGapView]`初始化`webView`，之前从声明中知道`webView`是个`UIView`，这时候会通过`[self newCordovaViewWithFrame:webViewBounds]`创建这个视图，声明成`UIView`的好处就是可以让开发者自定义配置文件中的`CordovaWebViewEngine`和Web View的插件，当前版本则缺省使用`CDVUIWebViewEngine`作为`webViewEngine`，在这个类的内部则是强制转换`webView`为`UIWebView`来使用了。
     2. 通过从1中获取的配置解析出来的变量`startupPluginNames`获得启动就要加载的插件，在此处进行注册初始化（调用插件的`pluginInitialize`方法），过程中会记录每个插件的注册初始化所花的时间，并在最后记录到`pluginObjects`数组属性中，做成强引用，使插件不会被释放。
     3. 通过从1中获取并解析出来的属性中尝试读取Web View的初始页页面，页面存在就加载，不存在就报错误页面，假如链错误页面也没指定，就单纯加载一个显示错误信息的body标签。
+
 ```ObjC
 - (void)viewDidLoad
 {
@@ -154,7 +157,9 @@ categories: Framework
     [self.webView setBackgroundColor:bgColor];
 }
 ```
+
 3. 后面的生命周期方法，都是简单继承实现并加上了通知中心对生命周期的通知。
+
 ```ObjC
 -(void)viewWillAppear:(BOOL)animated
 {
@@ -192,7 +197,9 @@ categories: Framework
     [[NSNotificationCenter defaultCenter] postNotification:[NSNotification notificationWithName:CDVViewDidLayoutSubviewsNotification object:nil]];
 }
 ```
+
 4. 析构函数中释放一些内存（含插件，即插件是跟随页面析构做析构的）。
+
 ```ObjC
 - (void)dealloc
 {
