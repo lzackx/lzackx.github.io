@@ -11,4 +11,16 @@ layout: default
   <article class="post-content">
     {{ content }}
   </article>
+  <div id="gitalk-container"></div>
+  <script type="text/javascript">
+    var gitalk = new Gitalk({
+      clientID: '0c3d87d7ee9b5db96320',
+      clientSecret: '7b6ffc50991501ea9f3d213862db4297d9cb6b71',
+      repo: 'lzackx.github.io',
+      owner: 'lzackx',
+      admin: ['lzackx'],
+      id:'{{page.title}}'
+    })
+  gitalk.render('gitalk-container')
+  </script>
 </div>
