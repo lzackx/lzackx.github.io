@@ -8,7 +8,7 @@ categories: Objective-C
 
 # 1. 前言
 
-&emsp;&emsp;广泛地，iOS开发者都会以[`Objective-C`](https://github.com/opensource-apple/objc4)是`C++`的超集来作为这门语言的入门描述。
+&emsp;&emsp;广泛地，iOS开发者都会以[`objc`](https://github.com/opensource-apple/objc4)是`C++`的超集来作为这门语言的入门描述。
 
 ## 1.1. `C++`
 
@@ -160,6 +160,16 @@ OBJC_EXPORT
 
 #endif
 ```
+
+&emsp;&emsp;在头文件中，可以看得出的关注点：
+
+1. 可以发现关于`NSObject`，声明了一个`protocol`和一个`interface`，并且`interface`遵循同名`protocol`
+2. 声明了是`NSObject`子类的3个类`NSString`, `NSMethodSignature`, `NSInvocation`，这是很特殊的，因为基类的方法与子类的类型有关系
+3. 有若干个熟悉而陌生的类型，`id`, `Class`, `SEL`, `IMP`，它们是`objc`与`runtime`载体
+
+&emsp;&emsp;
+
+
 
 # 3. 宏观
 
