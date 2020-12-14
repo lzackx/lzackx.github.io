@@ -12,7 +12,7 @@ categories: Objective-C
 
 ## 1.1. `C++`
 
-&emsp;&emsp;在前言里，对于涉及到的`C++`特性，先描述一下。
+&emsp;&emsp;在前言里，对于涉及到的`C++`特性，如下：
 
 1. `Struct`与`Class`，
    1. 同：可继承、多态、包含成员函数
@@ -35,6 +35,9 @@ categories: Objective-C
     struct a *v2
     A_P v2;
     ```
+&emsp;&emsp;涉及到的`objc`的设计概念，如下：
+
+1. [Tagged Pointer](https://blog.devtang.com/2014/05/30/understand-tagged-pointer/)
 
 # 2. 微观
 
