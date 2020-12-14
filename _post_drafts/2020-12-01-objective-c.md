@@ -654,7 +654,11 @@ OBJC_EXPORT
 
 &emsp;&emsp;`objc_object`结构体内的函数，部分实现位于`objc-object.h`文件中，剩余部分位于`NSObject.mm`文件中。
 
-&emsp;&emsp;先来看声明，如下：
+&emsp;&emsp;先来看声明，如下，从声明中，可以关注到几点：
+
+1. `isa`是`struct isa_t`类型的私有变量
+2. 内存管理相关的函数
+3. `sidetable`的用处
 
 ```ObjC
 struct objc_object {
