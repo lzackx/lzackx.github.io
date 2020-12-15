@@ -1,6 +1,6 @@
 # Site settings
 title: lZackx
-motto: I am the Will of my Codes
+motto: May the force be with you.
 email: zackx@foxmail.com
 description: > # this means to ignore newlines until "baseurl:"
   A Full Stack Developer.
@@ -11,3 +11,4 @@ github_username:  lzackx
 
 # Build settings
 markdown: kramdown
+highlighter: rouge
