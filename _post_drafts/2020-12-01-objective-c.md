@@ -343,6 +343,18 @@ union isa_t
 
 &emsp;&emsp;`Tagged Pointer`的出现，使特定类型数据的内存存取获得了倍数级的提升。
 
+&emsp;&emsp;在`objc-config.h`中，可以看到决定是否支持使用`Tagged Pointer`的宏，如下，
+
+```ObjC
+// Define SUPPORT_TAGGED_POINTERS=1 to enable tagged pointer objects
+// Be sure to edit tagged pointer SPI in objc-internal.h as well.
+#if !(__OBJC2__  &&  __LP64__)
+#   define SUPPORT_TAGGED_POINTERS 0
+#else
+#   define SUPPORT_TAGGED_POINTERS 1
+#endif
+```
+
 &emsp;&emsp;在`objc-private.h`中，可以看到一个头文件的引入，如下：
 
 ```ObjC
@@ -474,14 +486,15 @@ OBJC_EXPORT void _objc_insert_tagged_isa(unsigned char slotNumber, Class isa)
         return (void*)((1UL << 63) | ((uintptr_t)tag << 60) | (value & ~(0xFUL << 60)));
     }
    ```
-4. 对于从目前的实验来看，需要注意几点：
+4. 
+5. 从目前的实验来看，需要注意几点：
    1. 对于目前iOS14的情况，`Tagged Pointer`数据的放置安排与代码不相符，`tag`数据变更了放置在0～2下标的位中。
    2. Xcode中编译运行的代码里，对`Tagged Pointer`的内存地址进行了混淆，需要设置运行环境变量`OBJC_DISABLE_TAG_OBFUSCATION`为`false`才能发现`Tagged Pointer`的真正内存情况。
    3. 基于前2点的表述，需要明白的是，实际最新的系统运行着的与开源的代码，存在着差异。但是`Tagged Pointer`这种内存优化手段的设计目的与实现情况还是运行着在所有设备中。唯一可能有阻碍的，大概是逆向的动态调试时，需要改变一下数据的查看规则了。对于这种数据情况的不符合，具体各个细分类型的细节暂不深究。
    
 ### 2.3.2 nonpointer isa
 
-&emsp;&emsp;`nonpointer isa`是在非`Tagged Pointer`情况下，优化数据存取的方式，可以直观地在`union isa_t`中看到具体的数据有什么，得益于内部的结构体，我们能清楚地知道`isa`的数据是怎么放置的，如下：
+&emsp;&emsp;`nonpointer isa`是在非`Tagged Pointer`情况下，优化数据存取的方式，可以直观地在`union isa_t`中看到具体的数据有什么，得益于内部的结构体，我们能清楚地知道`isa`数据的放置情况的，如下：
 
 ```ObjC
 #   define ISA_MASK        0x0000000ffffffff8ULL
@@ -502,9 +515,76 @@ OBJC_EXPORT void _objc_insert_tagged_isa(unsigned char slotNumber, Class isa)
     };
 ```
 
-&emsp;&emsp;
+&emsp;&emsp;在iOS设备中，以MSB（大端）的方式排列数据，这个结构体把64bit中的每个bit都安排得妥妥当当。
+
+&emsp;&emsp;其中，真正的`ISA`地址只占用了64bit中的33bit，在需要获取的时候，则是通过`ISA_MASK`这个宏中的掩码进行与操作获取。
+
+&emsp;&emsp;其他的位代表的意思，大部分能从表面的字意明白，如果有疑惑，可以通过`struct objc_object`内的函数操作了解。
+
+&emsp;&emsp;首先，从初始化切入，`objc_object`的初始化函数实现（位于`objc-object.h`）如下：
+
+```ObjC
+inline void 
+objc_object::initIsa(Class cls)
+{
+    initIsa(cls, false, false);
+}
+
+inline void 
+objc_object::initClassIsa(Class cls)
+{
+    if (DisableIndexedIsa) {
+        initIsa(cls, false, false);
+    } else {
+        initIsa(cls, true, false);
+    }
+}
+
+inline void
+objc_object::initProtocolIsa(Class cls)
+{
+    return initClassIsa(cls);
+}
+
+inline void 
+objc_object::initInstanceIsa(Class cls, bool hasCxxDtor)
+{
+    assert(!UseGC);
+    assert(!cls->requiresRawIsa());
+    assert(hasCxxDtor == cls->hasCxxDtor());
+
+    initIsa(cls, true, hasCxxDtor);
+}
+
+inline void 
+objc_object::initIsa(Class cls, bool indexed, bool hasCxxDtor) 
+{ 
+    assert(!isTaggedPointer()); 
+    
+    if (!indexed) {
+        isa.cls = cls;
+    } else {
+        assert(!DisableIndexedIsa);
+        isa.bits = ISA_MAGIC_VALUE;
+        // isa.magic is part of ISA_MAGIC_VALUE
+        // isa.indexed is part of ISA_MAGIC_VALUE
+        isa.has_cxx_dtor = hasCxxDtor;
+        isa.shiftcls = (uintptr_t)cls >> 3;
+    }
+}
+```
 
 
 # 3. 宏观
 
 &emsp;&emsp;从`objc_object`到`NSObject`，联系都在这里。
+
+## 3.1 `SEL` & `IMP`
+
+## 3.2 Property
+
+## 3.3 Category
+
+## 3.4 Association
+
+## 3.5 Autoreleasepool
