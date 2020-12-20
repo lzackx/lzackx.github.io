@@ -106,7 +106,6 @@ OBJC_EXPORT
     ...
 */
 
-
 // Replaced by CF (returns an NSMethodSignature)
 + (NSMethodSignature *)instanceMethodSignatureForSelector:(SEL)sel {
     _objc_fatal("+[NSObject instanceMethodSignatureForSelector:] "
@@ -160,7 +159,6 @@ OBJC_EXPORT
     return [self description];
 }
 
-
 /*
     ...
 */
@@ -178,7 +176,7 @@ OBJC_EXPORT
 2. 3个在声明中的类`NSString`, `NSMethodSignature`, `NSInvocation`，在实现中是没有作用的，因为相关返回类型或参数类型在实现中并没有调用，并且可以看到一些类的方法实现，需要依赖`CoreFoundation`内的代码才有实现的意义
 3. `objc`与`runtime`载体，`id`, `Class`, `SEL`, `IMP`，它们的声明在源码中是有分叉的，很容易让人迷惑。
    1. 在`NSObject.h`引入的头文件`objc.h`中，有一份相关的声明，如下，作为一份对外声明的头文件来说，显然声明了`id`, `Class`, `SEL`, `IMP`这4个名字是什么数据类型的别名。
-    ```ObjC
+        ```ObjC
         #include <objc/objc-api.h>
 
         // ...
@@ -189,7 +187,7 @@ OBJC_EXPORT
 
         /// Represents an instance of a class.
         struct objc_object {
-            Class isa  OBJC_ISA_AVAILABILITY;
+            Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
         };
 
         /// A pointer to an instance of a class.
@@ -203,45 +201,45 @@ OBJC_EXPORT
         #if !OBJC_OLD_DISPATCH_PROTOTYPES
         typedef void (*IMP)(void /* id, SEL, ... */ ); 
         #else
-        typedef id (*IMP)(id, SEL, ...); 
+        typedef id _Nullable (*IMP)(id _Nonnull, SEL _Nonnull, ...); 
         #endif
-    ```
+        ```
    2. 在`NSObject.mm`引入的头文件`objc-private.h`中，却有特别的引入头文件方式，如下，先引入`objc-private.h`，再引入`NSObject.h`。
       1. `NSObject.mm`源码：
         ```ObjC
-            #include "objc-private.h"
-            #include "NSObject.h"
+        #include "objc-private.h"
+        #include "NSObject.h"
         ```
       2. `objc-private.h`源码：
         ```ObjC
-            // ...
-            #ifdef _OBJC_OBJC_H_
-            #error include objc-private.h before other headers
-            #endif
+        // ...
+        #ifdef _OBJC_OBJC_H_
+        #error include objc-private.h before other headers
+        #endif
 
-            #define OBJC_TYPES_DEFINED 1
+        #define OBJC_TYPES_DEFINED 1
 
-            // ...
+        // ...
 
-            struct objc_class;
-            struct objc_object;
+        struct objc_class;
+        struct objc_object;
 
-            typedef struct objc_class *Class;
-            typedef struct objc_object *id;
+        typedef struct objc_class *Class;
+        typedef struct objc_object *id;
         ```
       3. 如此一来，`objc-private.h`中定义的宏`OBJC_TYPES_DEFINED`，使得`NSObject.mm`中关于`id`, `Class`的别名声明不是使用`objc.h`中的，而是`objc-private.h`内的再次声明的别名了。
       4. 从前面几个注意点可以看出，实际的这几个`objc`与`runtime`载体，有效的声明如下：
         ```ObjC
-            // 结构体声明别名
-            typedef struct objc_class *Class;
-            typedef struct objc_object *id;
-            // objc.h中的声明是有效的
-            typedef struct objc_selector *SEL;
-            // 声明 IMP 为类型别名的函数指针
-            // 第一个参数是 id 类型，即 struct objc_object *
-            // 第二个参数是 SEL 类型， 即 struct objc_selector *
-            // 后续参数可变
-            typedef id (*IMP)(id, SEL, ...); 
+        // 结构体声明别名
+        typedef struct objc_class *Class;
+        typedef struct objc_object *id;
+        // objc.h中的声明是有效的
+        typedef struct objc_selector *SEL;
+        // 声明 IMP 为类型别名的函数指针
+        // 第一个参数是 id 类型，即 struct objc_object *
+        // 第二个参数是 SEL 类型， 即 struct objc_selector *
+        // 后续参数可变
+        typedef id (*IMP)(id, SEL, ...); 
         ```
 ## 2.2 `objc_object`
 
@@ -272,65 +270,28 @@ public:
 
 ## 2.3 `isa_t`
 
-&emsp;&emsp;`isa_t`是个`union`，一方面各成员共用内存，节省内存空间，一方面出于优化内存目的而方便改变数据类型。代码如下：
+&emsp;&emsp;`isa_t`是个`union`，一方面各成员共用内存，节省内存空间，一方面出于优化内存目的而方便读取数据。位于`objc-private.h`，代码如下：
 
-**备注：本文提及的知识点仅限于`arm64`的`iOS`系统，其他平台有所差异。**
+**备注：本文提及的知识点仅限于`arm64`的`iPhoneOS`系统，其他平台有所差异。**
 
 ```ObjC
-union isa_t 
-{
+#include "isa.h"
+
+union isa_t {
     isa_t() { }
     isa_t(uintptr_t value) : bits(value) { }
 
     Class cls;
     uintptr_t bits;
-
-#if SUPPORT_NONPOINTER_ISA
-
-    // extra_rc must be the MSB-most field (so it matches carry/overflow flags)
-    // indexed must be the LSB (fixme or get rid of it)
-    // shiftcls must occupy the same bits that a real class pointer would
-    // bits + RC_ONE is equivalent to extra_rc + 1
-    // RC_HALF is the high bit of extra_rc (i.e. half of its range)
-
-    // future expansion:
-    // uintptr_t fast_rr : 1;     // no r/r overrides
-    // uintptr_t lock : 2;        // lock for atomic property, @synch
-    // uintptr_t extraBytes : 1;  // allocated with extra bytes
-
-# if __arm64__
-#   define ISA_MASK        0x0000000ffffffff8ULL
-#   define ISA_MAGIC_MASK  0x000003f000000001ULL
-#   define ISA_MAGIC_VALUE 0x000001a000000001ULL
+#if defined(ISA_BITFIELD)
     struct {
-        uintptr_t indexed           : 1;
-        uintptr_t has_assoc         : 1;
-        uintptr_t has_cxx_dtor      : 1;
-        uintptr_t shiftcls          : 33; // MACH_VM_MAX_ADDRESS 0x1000000000
-        uintptr_t magic             : 6;
-        uintptr_t weakly_referenced : 1;
-        uintptr_t deallocating      : 1;
-        uintptr_t has_sidetable_rc  : 1;
-        uintptr_t extra_rc          : 19;
-#       define RC_ONE   (1ULL<<45)
-#       define RC_HALF  (1ULL<<18)
+        ISA_BITFIELD;  // defined in isa.h
     };
-/*
-    ...
-*/
-
-# else
-    // Available bits in isa field are architecture-specific.
-#   error unknown architecture
-# endif
-
-// SUPPORT_NONPOINTER_ISA
 #endif
-
 };
 ```
 
-&emsp;&emsp;对于`isa_t`，有2点重要的内存优化知识需要掌握:
+&emsp;&emsp;对于`isa_t`，除了正常的64位指针，还有有2点重要的内存优化知识需要掌握:
 
 1. Tagged Pointer
 2. nonpointer isa
@@ -372,39 +333,156 @@ union isa_t
 
 #if OBJC_HAVE_TAGGED_POINTERS
 
-// Tagged pointer layout and usage is subject to change 
-// on different OS versions. The current layout is:
-// (MSB)
-// 60 bits  payload
-//  3 bits  tag index
-//  1 bit   1 for tagged pointer objects, 0 for ordinary objects
-// (LSB)
+// Tagged pointer layout and usage is subject to change on different OS versions.
+
+// Tag indexes 0..<7 have a 60-bit payload.
+// Tag index 7 is reserved.
+// Tag indexes 8..<264 have a 52-bit payload.
+// Tag index 264 is reserved.
 
 #if __has_feature(objc_fixed_enum)  ||  __cplusplus >= 201103L
-enum objc_tag_index_t : uint8_t
+enum objc_tag_index_t : uint16_t
 #else
-typedef uint8_t objc_tag_index_t;
+typedef uint16_t objc_tag_index_t;
 enum
 #endif
 {
+    // 60-bit payloads
     OBJC_TAG_NSAtom            = 0, 
     OBJC_TAG_1                 = 1, 
     OBJC_TAG_NSString          = 2, 
     OBJC_TAG_NSNumber          = 3, 
     OBJC_TAG_NSIndexPath       = 4, 
     OBJC_TAG_NSManagedObjectID = 5, 
-    OBJC_TAG_NSDate            = 6, 
-    OBJC_TAG_7                 = 7
+    OBJC_TAG_NSDate            = 6,
+
+    // 60-bit reserved
+    OBJC_TAG_RESERVED_7        = 7, 
+
+    // 52-bit payloads
+    OBJC_TAG_Photos_1          = 8,
+    OBJC_TAG_Photos_2          = 9,
+    OBJC_TAG_Photos_3          = 10,
+    OBJC_TAG_Photos_4          = 11,
+    OBJC_TAG_XPC_1             = 12,
+    OBJC_TAG_XPC_2             = 13,
+    OBJC_TAG_XPC_3             = 14,
+    OBJC_TAG_XPC_4             = 15,
+    OBJC_TAG_NSColor           = 16,
+    OBJC_TAG_UIColor           = 17,
+    OBJC_TAG_CGColor           = 18,
+    OBJC_TAG_NSIndexSet        = 19,
+
+    OBJC_TAG_First60BitPayload = 0, 
+    OBJC_TAG_Last60BitPayload  = 6, 
+    OBJC_TAG_First52BitPayload = 8, 
+    OBJC_TAG_Last52BitPayload  = 263, 
+
+    OBJC_TAG_RESERVED_264      = 264
 };
 #if __has_feature(objc_fixed_enum)  &&  !defined(__cplusplus)
 typedef enum objc_tag_index_t objc_tag_index_t;
 #endif
 
-OBJC_EXPORT void _objc_registerTaggedPointerClass(objc_tag_index_t tag, Class cls)
-    __OSX_AVAILABLE_STARTING(__MAC_10_9, __IPHONE_7_0);
 
-OBJC_EXPORT Class _objc_getClassForTag(objc_tag_index_t tag)
-    __OSX_AVAILABLE_STARTING(__MAC_10_9, __IPHONE_7_0);
+// Returns true if tagged pointers are enabled.
+// The other functions below must not be called if tagged pointers are disabled.
+static inline bool 
+_objc_taggedPointersEnabled(void);
+
+// Register a class for a tagged pointer tag.
+// Aborts if the tag is invalid or already in use.
+OBJC_EXPORT void
+_objc_registerTaggedPointerClass(objc_tag_index_t tag, Class _Nonnull cls)
+    OBJC_AVAILABLE(10.9, 7.0, 9.0, 1.0, 2.0);
+
+// Returns the registered class for the given tag.
+// Returns nil if the tag is valid but has no registered class.
+// Aborts if the tag is invalid.
+OBJC_EXPORT Class _Nullable
+_objc_getClassForTag(objc_tag_index_t tag)
+    OBJC_AVAILABLE(10.9, 7.0, 9.0, 1.0, 2.0);
+
+// Create a tagged pointer object with the given tag and payload.
+// Assumes the tag is valid.
+// Assumes tagged pointers are enabled.
+// The payload will be silently truncated to fit.
+static inline void * _Nonnull
+_objc_makeTaggedPointer(objc_tag_index_t tag, uintptr_t payload);
+
+// Return true if ptr is a tagged pointer object.
+// Does not check the validity of ptr's class.
+static inline bool 
+_objc_isTaggedPointer(const void * _Nullable ptr);
+
+// Extract the tag value from the given tagged pointer object.
+// Assumes ptr is a valid tagged pointer object.
+// Does not check the validity of ptr's tag.
+static inline objc_tag_index_t 
+_objc_getTaggedPointerTag(const void * _Nullable ptr);
+
+// Extract the payload from the given tagged pointer object.
+// Assumes ptr is a valid tagged pointer object.
+// The payload value is zero-extended.
+static inline uintptr_t
+_objc_getTaggedPointerValue(const void * _Nullable ptr);
+
+// Extract the payload from the given tagged pointer object.
+// Assumes ptr is a valid tagged pointer object.
+// The payload value is sign-extended.
+static inline intptr_t
+_objc_getTaggedPointerSignedValue(const void * _Nullable ptr);
+
+// Don't use the values below. Use the declarations above.
+
+#if (TARGET_OS_OSX || TARGET_OS_IOSMAC) && __x86_64__
+    // 64-bit Mac - tag bit is LSB
+#   define OBJC_MSB_TAGGED_POINTERS 0
+#else
+    // Everything else - tag bit is MSB
+#   define OBJC_MSB_TAGGED_POINTERS 1
+#endif
+
+#define _OBJC_TAG_INDEX_MASK 0x7
+// array slot includes the tag bit itself
+#define _OBJC_TAG_SLOT_COUNT 16
+#define _OBJC_TAG_SLOT_MASK 0xf
+
+#define _OBJC_TAG_EXT_INDEX_MASK 0xff
+// array slot has no extra bits
+#define _OBJC_TAG_EXT_SLOT_COUNT 256
+#define _OBJC_TAG_EXT_SLOT_MASK 0xff
+
+#if OBJC_MSB_TAGGED_POINTERS
+#   define _OBJC_TAG_MASK (1UL<<63)
+#   define _OBJC_TAG_INDEX_SHIFT 60
+#   define _OBJC_TAG_SLOT_SHIFT 60
+#   define _OBJC_TAG_PAYLOAD_LSHIFT 4
+#   define _OBJC_TAG_PAYLOAD_RSHIFT 4
+#   define _OBJC_TAG_EXT_MASK (0xfUL<<60)
+#   define _OBJC_TAG_EXT_INDEX_SHIFT 52
+#   define _OBJC_TAG_EXT_SLOT_SHIFT 52
+#   define _OBJC_TAG_EXT_PAYLOAD_LSHIFT 12
+#   define _OBJC_TAG_EXT_PAYLOAD_RSHIFT 12
+#else
+/*
+    ...
+*/
+#endif
+
+extern uintptr_t objc_debug_taggedpointer_obfuscator;
+
+static inline void * _Nonnull
+_objc_encodeTaggedPointer(uintptr_t ptr)
+{
+    return (void *)(objc_debug_taggedpointer_obfuscator ^ ptr);
+}
+
+static inline uintptr_t
+_objc_decodeTaggedPointer(const void * _Nullable ptr)
+{
+    return (uintptr_t)ptr ^ objc_debug_taggedpointer_obfuscator;
+}
 
 static inline bool 
 _objc_taggedPointersEnabled(void)
@@ -413,163 +491,384 @@ _objc_taggedPointersEnabled(void)
     return (objc_debug_taggedpointer_mask != 0);
 }
 
-#if TARGET_OS_IPHONE
-// tagged pointer marker is MSB
-
-static inline void *
+static inline void * _Nonnull
 _objc_makeTaggedPointer(objc_tag_index_t tag, uintptr_t value)
 {
-    // assert(_objc_taggedPointersEnabled());
-    // assert((unsigned int)tag < 8);
-    // assert(((value << 4) >> 4) == value);
-    return (void*)((1UL << 63) | ((uintptr_t)tag << 60) | (value & ~(0xFUL << 60)));
+    // PAYLOAD_LSHIFT and PAYLOAD_RSHIFT are the payload extraction shifts.
+    // They are reversed here for payload insertion.
+
+    // ASSERT(_objc_taggedPointersEnabled());
+    if (tag <= OBJC_TAG_Last60BitPayload) {
+        // ASSERT(((value << _OBJC_TAG_PAYLOAD_RSHIFT) >> _OBJC_TAG_PAYLOAD_LSHIFT) == value);
+        uintptr_t result =
+            (_OBJC_TAG_MASK | 
+             ((uintptr_t)tag << _OBJC_TAG_INDEX_SHIFT) | 
+             ((value << _OBJC_TAG_PAYLOAD_RSHIFT) >> _OBJC_TAG_PAYLOAD_LSHIFT));
+        return _objc_encodeTaggedPointer(result);
+    } else {
+        // ASSERT(tag >= OBJC_TAG_First52BitPayload);
+        // ASSERT(tag <= OBJC_TAG_Last52BitPayload);
+        // ASSERT(((value << _OBJC_TAG_EXT_PAYLOAD_RSHIFT) >> _OBJC_TAG_EXT_PAYLOAD_LSHIFT) == value);
+        uintptr_t result =
+            (_OBJC_TAG_EXT_MASK |
+             ((uintptr_t)(tag - OBJC_TAG_First52BitPayload) << _OBJC_TAG_EXT_INDEX_SHIFT) |
+             ((value << _OBJC_TAG_EXT_PAYLOAD_RSHIFT) >> _OBJC_TAG_EXT_PAYLOAD_LSHIFT));
+        return _objc_encodeTaggedPointer(result);
+    }
 }
 
 static inline bool 
-_objc_isTaggedPointer(const void *ptr) 
+_objc_isTaggedPointer(const void * _Nullable ptr)
 {
-    return (intptr_t)ptr < 0;  // a.k.a. ptr & 0x8000000000000000
+    return ((uintptr_t)ptr & _OBJC_TAG_MASK) == _OBJC_TAG_MASK;
 }
 
 static inline objc_tag_index_t 
-_objc_getTaggedPointerTag(const void *ptr) 
+_objc_getTaggedPointerTag(const void * _Nullable ptr) 
 {
-    // assert(_objc_isTaggedPointer(ptr));
-    return (objc_tag_index_t)(((uintptr_t)ptr >> 60) & 0x7);
+    // ASSERT(_objc_isTaggedPointer(ptr));
+    uintptr_t value = _objc_decodeTaggedPointer(ptr);
+    uintptr_t basicTag = (value >> _OBJC_TAG_INDEX_SHIFT) & _OBJC_TAG_INDEX_MASK;
+    uintptr_t extTag =   (value >> _OBJC_TAG_EXT_INDEX_SHIFT) & _OBJC_TAG_EXT_INDEX_MASK;
+    if (basicTag == _OBJC_TAG_INDEX_MASK) {
+        return (objc_tag_index_t)(extTag + OBJC_TAG_First52BitPayload);
+    } else {
+        return (objc_tag_index_t)basicTag;
+    }
 }
 
 static inline uintptr_t
-_objc_getTaggedPointerValue(const void *ptr) 
+_objc_getTaggedPointerValue(const void * _Nullable ptr) 
 {
-    // assert(_objc_isTaggedPointer(ptr));
-    return (uintptr_t)ptr & 0x0fffffffffffffff;
+    // ASSERT(_objc_isTaggedPointer(ptr));
+    uintptr_t value = _objc_decodeTaggedPointer(ptr);
+    uintptr_t basicTag = (value >> _OBJC_TAG_INDEX_SHIFT) & _OBJC_TAG_INDEX_MASK;
+    if (basicTag == _OBJC_TAG_INDEX_MASK) {
+        return (value << _OBJC_TAG_EXT_PAYLOAD_LSHIFT) >> _OBJC_TAG_EXT_PAYLOAD_RSHIFT;
+    } else {
+        return (value << _OBJC_TAG_PAYLOAD_LSHIFT) >> _OBJC_TAG_PAYLOAD_RSHIFT;
+    }
 }
 
 static inline intptr_t
-_objc_getTaggedPointerSignedValue(const void *ptr) 
+_objc_getTaggedPointerSignedValue(const void * _Nullable ptr) 
 {
-    // assert(_objc_isTaggedPointer(ptr));
-    return ((intptr_t)ptr << 4) >> 4;
+    // ASSERT(_objc_isTaggedPointer(ptr));
+    uintptr_t value = _objc_decodeTaggedPointer(ptr);
+    uintptr_t basicTag = (value >> _OBJC_TAG_INDEX_SHIFT) & _OBJC_TAG_INDEX_MASK;
+    if (basicTag == _OBJC_TAG_INDEX_MASK) {
+        return ((intptr_t)value << _OBJC_TAG_EXT_PAYLOAD_LSHIFT) >> _OBJC_TAG_EXT_PAYLOAD_RSHIFT;
+    } else {
+        return ((intptr_t)value << _OBJC_TAG_PAYLOAD_LSHIFT) >> _OBJC_TAG_PAYLOAD_RSHIFT;
+    }
 }
 
-// TARGET_OS_IPHONE
-#else
-// not TARGET_OS_IPHONE
-// tagged pointer marker is LSB
-
-/*
-    ...
-*/
-
-// not TARGET_OS_IPHONE
-#endif
-
-
-OBJC_EXPORT void _objc_insert_tagged_isa(unsigned char slotNumber, Class isa)
-    __OSX_AVAILABLE_BUT_DEPRECATED(__MAC_10_7,__MAC_10_9, __IPHONE_4_3,__IPHONE_7_0);
-
+// OBJC_HAVE_TAGGED_POINTERS
 #endif
 ```
 
 &emsp;&emsp;从这段代码中，我们可以看明白`Tagged Pointer`是怎么优化内存的。
 
-1. 别名为`objc_tag_index_t`的枚举内，对`Tagged Pointer`的类型进行了细分，只有枚举中的类型可以在少量数据的情况下使用`Tagged Pointer`方式读写。从数字的最大值可以发现，类型的区分，最多只需要3bits，即`111`。
+1. 别名为`objc_tag_index_t`的枚举内，对`Tagged Pointer`的类型进行了细分，只有枚举中的类型可以在少量数据的情况下使用`Tagged Pointer`方式读写。
 2. 对于iPhone设备，数据使用MSB，即大端，读写。
-3. 在看创建`Tagged Pointer`的内联静态函数的实现，如下，知道一个`Tagged Pointer`的`isa`变量是怎么放置数据的。
-   ```ObjC
-    static inline void *
-    _objc_makeTaggedPointer(objc_tag_index_t tag, uintptr_t value)
-    {
-        // assert(_objc_taggedPointersEnabled());
-        // assert((unsigned int)tag < 8);
-        // assert(((value << 4) >> 4) == value);
-        return (void*)((1UL << 63) | ((uintptr_t)tag << 60) | (value & ~(0xFUL << 60)));
-    }
-   ```
-4. 
-5. 从目前的实验来看，需要注意几点：
-   1. 对于目前iOS14的情况，`Tagged Pointer`数据的放置安排与代码不相符，`tag`数据变更了放置在0～2下标的位中。
-   2. Xcode中编译运行的代码里，对`Tagged Pointer`的内存地址进行了混淆，需要设置运行环境变量`OBJC_DISABLE_TAG_OBFUSCATION`为`false`才能发现`Tagged Pointer`的真正内存情况。
-   3. 基于前2点的表述，需要明白的是，实际最新的系统运行着的与开源的代码，存在着差异。但是`Tagged Pointer`这种内存优化手段的设计目的与实现情况还是运行着在所有设备中。唯一可能有阻碍的，大概是逆向的动态调试时，需要改变一下数据的查看规则了。对于这种数据情况的不符合，具体各个细分类型的细节暂不深究。
+3. 再看创建`Tagged Pointer`的内联静态函数的实现，`Tagged Pointer`的`isa`根据数据类型枚举，区分数据的`payloads`位数，把数据放置到`isa`相应的位里。
+4. `Tagged Pointer`的内存地址会被`objc_debug_taggedpointer_obfuscator`进行混淆，需要设置运行环境变量`OBJC_DISABLE_TAG_OBFUSCATION`为`false`才能发现`Tagged Pointer`的真正内存情况。
+5. 从不同版本的`objc4`开源代码中对比，可以发现支持`Tagged Pointer`优化的数据类型越来越多了，内部的数据哪些bit代表的是哪些标识可以通过`OBJC_MSB_TAGGED_POINTERS`内定义的宏来位移获取，在优化内存这一方面，Apple真的是玩出花来了。
+
+**总结：**`Tagged Pointer`对内存的优化，本质上，是把数据量少的变量数据存放在`isa`中，这时候`isa`就不是正常意义上的指针了，它本身就包含了数据以及数据类型等信息，在内存读写的时候，可以省略掉通过指针获取数据的步骤直接获取数据，在微观上虽然省得不多，但在宏观大量的读写内存数据的情况下，可以达到很惊人的优化效果。
    
 ### 2.3.2 nonpointer isa
 
-&emsp;&emsp;`nonpointer isa`是在非`Tagged Pointer`情况下，优化数据存取的方式，可以直观地在`union isa_t`中看到具体的数据有什么，得益于内部的结构体，我们能清楚地知道`isa`数据的放置情况的，如下：
+&emsp;&emsp;`ISA_BITFIELD`是宏，在`isa.h`中，是这么定义的：
+&emsp;&emsp;`nonpointer isa`是在非`Tagged Pointer`情况下，优化数据存取的方式，可以直观地在`union isa_t`中看到具体的数据有什么，得益于内部的结构体（`ISA_BITFIELD`），我们能清楚地知道`isa`数据的放置情况的。
+
+&emsp;&emsp;`ISA_BITFIELD`是宏，在`isa.h`中，是这么定义的：
 
 ```ObjC
+#ifndef _OBJC_ISA_H_
+#define _OBJC_ISA_H_
+
+#include "objc-config.h"
+
+
+#if (!SUPPORT_NONPOINTER_ISA && !SUPPORT_PACKED_ISA && !SUPPORT_INDEXED_ISA) ||\
+    ( SUPPORT_NONPOINTER_ISA &&  SUPPORT_PACKED_ISA && !SUPPORT_INDEXED_ISA) ||\
+    ( SUPPORT_NONPOINTER_ISA && !SUPPORT_PACKED_ISA &&  SUPPORT_INDEXED_ISA)
+    // good config
+#else
+#   error bad config
+#endif
+
+
+#if SUPPORT_PACKED_ISA
+
+    // extra_rc must be the MSB-most field (so it matches carry/overflow flags)
+    // nonpointer must be the LSB (fixme or get rid of it)
+    // shiftcls must occupy the same bits that a real class pointer would
+    // bits + RC_ONE is equivalent to extra_rc + 1
+    // RC_HALF is the high bit of extra_rc (i.e. half of its range)
+
+    // future expansion:
+    // uintptr_t fast_rr : 1;     // no r/r overrides
+    // uintptr_t lock : 2;        // lock for atomic property, @synch
+    // uintptr_t extraBytes : 1;  // allocated with extra bytes
+
+# if __arm64__
 #   define ISA_MASK        0x0000000ffffffff8ULL
 #   define ISA_MAGIC_MASK  0x000003f000000001ULL
 #   define ISA_MAGIC_VALUE 0x000001a000000001ULL
-    struct {
-        uintptr_t indexed           : 1;
-        uintptr_t has_assoc         : 1;
-        uintptr_t has_cxx_dtor      : 1;
-        uintptr_t shiftcls          : 33; // MACH_VM_MAX_ADDRESS 0x1000000000
-        uintptr_t magic             : 6;
-        uintptr_t weakly_referenced : 1;
-        uintptr_t deallocating      : 1;
-        uintptr_t has_sidetable_rc  : 1;
-        uintptr_t extra_rc          : 19;
-#       define RC_ONE   (1ULL<<45)
-#       define RC_HALF  (1ULL<<18)
-    };
+#   define ISA_BITFIELD                                                      \
+      uintptr_t nonpointer        : 1;                                       \
+      uintptr_t has_assoc         : 1;                                       \
+      uintptr_t has_cxx_dtor      : 1;                                       \
+      uintptr_t shiftcls          : 33; /*MACH_VM_MAX_ADDRESS 0x1000000000*/ \
+      uintptr_t magic             : 6;                                       \
+      uintptr_t weakly_referenced : 1;                                       \
+      uintptr_t deallocating      : 1;                                       \
+      uintptr_t has_sidetable_rc  : 1;                                       \
+      uintptr_t extra_rc          : 19
+#   define RC_ONE   (1ULL<<45)
+#   define RC_HALF  (1ULL<<18)
+
+# elif __x86_64__
+
+/*
+    ...
+*/
+
+# else
+#   error unknown architecture for packed isa
+# endif
+
+// SUPPORT_PACKED_ISA
+#endif
+
+
+#if SUPPORT_INDEXED_ISA
+
+# if  __ARM_ARCH_7K__ >= 2  ||  (__arm64__ && !__LP64__)
+    // armv7k or arm64_32
+
+/*
+    ...
+*/
+
+# else
+#   error unknown architecture for indexed isa
+# endif
+
+// SUPPORT_INDEXED_ISA
+#endif
+
+
+// _OBJC_ISA_H_
+#endif
 ```
 
+&emsp;&emsp;在`isa.h`中，对于不同平台，有不同的宏用于控制`isa`各个bit的意义。本文在只讨论`iPhoneOS`的前提下，只贴出部分，排除掉了英特尔CPU的电脑部分与运行32位的arm64架构的嵌入式设备（如Apple Watch）。
+
 &emsp;&emsp;在iOS设备中，以MSB（大端）的方式排列数据，这个结构体把64bit中的每个bit都安排得妥妥当当。
+
+&emsp;&emsp;在理解`nonpointer isa`前，还需要区分2个概念：
+
+1. indexed isa
+2. packed isa
+
+&emsp;&emsp;它们通过在`objc-config.h`中的宏控制`nonpointer isa`的支持：
+
+```ObjC
+// Define SUPPORT_INDEXED_ISA=1 on platforms that store the class in the isa 
+// field as an index into a class table.
+// Note, keep this in sync with any .s files which also define it.
+// Be sure to edit objc-abi.h as well.
+#if __ARM_ARCH_7K__ >= 2  ||  (__arm64__ && !__LP64__)
+#   define SUPPORT_INDEXED_ISA 1
+#else
+#   define SUPPORT_INDEXED_ISA 0
+#endif
+
+// Define SUPPORT_PACKED_ISA=1 on platforms that store the class in the isa 
+// field as a maskable pointer with other data around it.
+#if (!__LP64__  ||  TARGET_OS_WIN32  ||  \
+     (TARGET_OS_SIMULATOR && !TARGET_OS_IOSMAC))
+#   define SUPPORT_PACKED_ISA 0
+#else
+#   define SUPPORT_PACKED_ISA 1
+#endif
+
+// Define SUPPORT_NONPOINTER_ISA=1 on any platform that may store something
+// in the isa field that is not a raw pointer.
+#if !SUPPORT_INDEXED_ISA  &&  !SUPPORT_PACKED_ISA
+#   define SUPPORT_NONPOINTER_ISA 0
+#else
+#   define SUPPORT_NONPOINTER_ISA 1
+#endif
+```
+
+&emsp;&emsp;在`iPhoneOS`中，`SUPPORT_PACKED_ISA`为1，`SUPPORT_INDEXED_ISA`为0，所以`SUPPORT_NONPOINTER_ISA`为1，是支持`nonpointer isa`的，并且是`packed isa`。
+
+&emsp;&emsp;
 
 &emsp;&emsp;其中，真正的`ISA`地址只占用了64bit中的33bit，在需要获取的时候，则是通过`ISA_MASK`这个宏中的掩码进行与操作获取。
 
 &emsp;&emsp;其他的位代表的意思，大部分能从表面的字意明白，如果有疑惑，可以通过`struct objc_object`内的函数操作了解。
 
-&emsp;&emsp;首先，从初始化切入，`objc_object`的初始化函数实现（位于`objc-object.h`）如下：
+&emsp;&emsp;从`ISA_BITFIELD`中，逐个查看他们的作用。
 
-```ObjC
-inline void 
-objc_object::initIsa(Class cls)
-{
-    initIsa(cls, false, false);
-}
+1. `nonpointer`，第1bit，区分`isa`是否使用`nonpointer isa`，`isa`是个`union`，在使用`nonpointer`的情况下，先以0值初始化，然后根据`nonpointer isa`内结构体的位进行默认赋值。没有使用的情况下，`isa`的初始化就是正常的一个指针。在`struct objc_object`的私有初始化函数中可以看到其实现：
+   ```ObjC
+    inline void 
+    objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor) 
+    { 
+        ASSERT(!isTaggedPointer()); 
+        
+        if (!nonpointer) {
+            isa = isa_t((uintptr_t)cls);
+        } else {
+            ASSERT(!DisableNonpointerIsa);
+            ASSERT(!cls->instancesRequireRawIsa());
 
-inline void 
-objc_object::initClassIsa(Class cls)
-{
-    if (DisableIndexedIsa) {
-        initIsa(cls, false, false);
-    } else {
-        initIsa(cls, true, false);
+            isa_t newisa(0);
+
+    #if SUPPORT_INDEXED_ISA
+            ASSERT(cls->classArrayIndex() > 0);
+            newisa.bits = ISA_INDEX_MAGIC_VALUE;
+            // isa.magic is part of ISA_MAGIC_VALUE
+            // isa.nonpointer is part of ISA_MAGIC_VALUE
+            newisa.has_cxx_dtor = hasCxxDtor;
+            newisa.indexcls = (uintptr_t)cls->classArrayIndex();
+    #else
+            newisa.bits = ISA_MAGIC_VALUE;
+            // isa.magic is part of ISA_MAGIC_VALUE
+            // isa.nonpointer is part of ISA_MAGIC_VALUE
+            newisa.has_cxx_dtor = hasCxxDtor;
+            newisa.shiftcls = (uintptr_t)cls >> 3;
+    #endif
+
+            // This write must be performed in a single store in some cases
+            // (for example when realizing a class because other threads
+            // may simultaneously try to use the class).
+            // fixme use atomics here to guarantee single-store and to
+            // guarantee memory order w.r.t. the class index table
+            // ...but not too atomic because we don't want to hurt instantiation
+            isa = newisa;
+        }
     }
-}
+   ```
+2. `has_assoc`，第2bit，在使用`nonpointer isa`的情况下，区分是否有联合对象（Association Object），相关函数如下：
+   ```ObjC
+   inline bool
+    objc_object::hasAssociatedObjects()
+    {
+        if (isTaggedPointer()) return true;
+        if (isa.nonpointer) return isa.has_assoc;
+        return true;
+    }
 
-inline void
-objc_object::initProtocolIsa(Class cls)
+
+    inline void
+    objc_object::setHasAssociatedObjects()
+    {
+        if (isTaggedPointer()) return;
+
+    retry:
+        isa_t oldisa = LoadExclusive(&isa.bits);
+        isa_t newisa = oldisa;
+        if (!newisa.nonpointer  ||  newisa.has_assoc) {
+            ClearExclusive(&isa.bits);
+            return;
+        }
+        newisa.has_assoc = true;
+        if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
+    }
+   ```
+3. `has_cxx_dtor`，
+4. `shiftcls`，
+5. `magic`，
+6. `weakly_referenced`，
+7. `deallocating`，
+8. `has_sidetable_rc`，
+9. `extra_rc`，
+
+&emsp;&emsp;`nonpointer isa`这种内存优化方式只在数据量在提供的bit能表达的情况下使用，当数据量超过了提供的bit能表达的数量时，就会切换为正常的指针。这些都是运行时进行的，这体现了`objc`提供出来的运行时特性，具体的实现函数如下：
+```ObjC
+inline Class 
+objc_object::changeIsa(Class newCls)
 {
-    return initClassIsa(cls);
-}
+    // This is almost always true but there are 
+    // enough edge cases that we can't assert it.
+    // assert(newCls->isFuture()  || 
+    //        newCls->isInitializing()  ||  newCls->isInitialized());
 
-inline void 
-objc_object::initInstanceIsa(Class cls, bool hasCxxDtor)
-{
-    assert(!UseGC);
-    assert(!cls->requiresRawIsa());
-    assert(hasCxxDtor == cls->hasCxxDtor());
+    ASSERT(!isTaggedPointer()); 
 
-    initIsa(cls, true, hasCxxDtor);
-}
+    isa_t oldisa;
+    isa_t newisa;
 
-inline void 
-objc_object::initIsa(Class cls, bool indexed, bool hasCxxDtor) 
-{ 
-    assert(!isTaggedPointer()); 
-    
-    if (!indexed) {
-        isa.cls = cls;
-    } else {
-        assert(!DisableIndexedIsa);
-        isa.bits = ISA_MAGIC_VALUE;
-        // isa.magic is part of ISA_MAGIC_VALUE
-        // isa.indexed is part of ISA_MAGIC_VALUE
-        isa.has_cxx_dtor = hasCxxDtor;
-        isa.shiftcls = (uintptr_t)cls >> 3;
+    bool sideTableLocked = false;
+    bool transcribeToSideTable = false;
+
+    do {
+        transcribeToSideTable = false;
+        oldisa = LoadExclusive(&isa.bits);
+        if ((oldisa.bits == 0  ||  oldisa.nonpointer)  &&
+            !newCls->isFuture()  &&  newCls->canAllocNonpointer())
+        {
+            // 0 -> nonpointer
+            // nonpointer -> nonpointer
+#if SUPPORT_INDEXED_ISA
+            if (oldisa.bits == 0) newisa.bits = ISA_INDEX_MAGIC_VALUE;
+            else newisa = oldisa;
+            // isa.magic is part of ISA_MAGIC_VALUE
+            // isa.nonpointer is part of ISA_MAGIC_VALUE
+            newisa.has_cxx_dtor = newCls->hasCxxDtor();
+            ASSERT(newCls->classArrayIndex() > 0);
+            newisa.indexcls = (uintptr_t)newCls->classArrayIndex();
+#else
+            if (oldisa.bits == 0) newisa.bits = ISA_MAGIC_VALUE;
+            else newisa = oldisa;
+            // isa.magic is part of ISA_MAGIC_VALUE
+            // isa.nonpointer is part of ISA_MAGIC_VALUE
+            newisa.has_cxx_dtor = newCls->hasCxxDtor();
+            newisa.shiftcls = (uintptr_t)newCls >> 3;
+#endif
+        }
+        else if (oldisa.nonpointer) {
+            // nonpointer -> raw pointer
+            // Need to copy retain count et al to side table.
+            // Acquire side table lock before setting isa to 
+            // prevent races such as concurrent -release.
+            if (!sideTableLocked) sidetable_lock();
+            sideTableLocked = true;
+            transcribeToSideTable = true;
+            newisa.cls = newCls;
+        }
+        else {
+            // raw pointer -> raw pointer
+            newisa.cls = newCls;
+        }
+    } while (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits));
+
+    if (transcribeToSideTable) {
+        // Copy oldisa's retain count et al to side table.
+        // oldisa.has_assoc: nothing to do
+        // oldisa.has_cxx_dtor: nothing to do
+        sidetable_moveExtraRC_nolock(oldisa.extra_rc, 
+                                     oldisa.deallocating, 
+                                     oldisa.weakly_referenced);
+    }
+
+    if (sideTableLocked) sidetable_unlock();
+
+    if (oldisa.nonpointer) {
+#if SUPPORT_INDEXED_ISA
+        return classForIndex(oldisa.indexcls);
+#else
+        return (Class)((uintptr_t)oldisa.shiftcls << 3);
+#endif
+    }
+    else {
+        return oldisa.cls;
     }
 }
 ```
