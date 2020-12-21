@@ -783,14 +783,14 @@ _objc_getTaggedPointerSignedValue(const void * _Nullable ptr)
     }
    ```
 3. `has_cxx_dtor`，[2]bit，在使用`nonpointer isa`的情况下，区分是否有C++的析构函数，出于改变`isa`指针、初始化与释放等场景的需要
-4. `shiftcls`，[3]~[36]bit，在使用`nonpointer isa`的情况下，存放真正的数据
+4. `shiftcls`，[3]~[36]bit，在使用`nonpointer isa`的情况下，使用33bit空间存储指向类的指针
 5. `magic`，[37]～[42]bit，在使用`nonpointer isa`的情况下，存放魔术数，也用于区分数据是否已初始化
 6. `weakly_referenced`，[43]bit，在使用`nonpointer isa`的情况下，是否有被弱引用，决定释放的时候，是否需要到`SideTable`中处理引用问题
 7. `deallocating`，[44]bit，在使用`nonpointer isa`的情况下，是否正在释放的标识位
 8. `has_sidetable_rc`，[45]bit，在使用`nonpointer isa`的情况下，是否有`SideTable`的引用计数
-9. `extra_rc`，[46]~[64]bit，在使用`nonpointer isa`的情况下，少量引用计数量的存放位，计算引用计数时加一，即（extra_rc + 1）
+9. `extra_rc`，[46]~[64]bit，在使用`nonpointer isa`的情况下，少量引用计数量的存放位，计算引用计数时加一，即（extra_rc + 1）。在引用计数超过19位能表达的值时，引用计数会移交`SideTable`记录，其中`RC_ONE`宏，是用来引用计数加一处理的，而`RC_HALF`则是每次引用计数溢出时，移交一半出去的量，剩余的一半依然留在`extra_rc`中。
 
-&emsp;&emsp;`nonpointer isa`这种内存优化方式只在数据量在提供的bit能表达的情况下使用，当数据量超过了提供的bit能表达的数量时，就会切换为正常的指针。这些都是运行时进行的，这体现了`objc`提供出来的运行时特性，具体的实现函数如下：
+&emsp;&emsp;`nonpointer isa`这种内存优化方式只在类指针地址在提供的bit能表达的情况下使用，当指针地址超过了提供的bit能表达的数量时，就会切换为正常的指针。这些都是运行时进行的，这体现了`objc`提供出来的运行时特性，具体的实现函数如下：
 ```ObjC
 inline Class 
 objc_object::changeIsa(Class newCls)
@@ -872,7 +872,15 @@ objc_object::changeIsa(Class newCls)
     }
 }
 ```
-**总结：**`nonpointer isa`的内存有话，本质上，是缩减数据量少的时候在内存读写时的消耗，与`Tagged Pointer`的优化相似，并不是一个正常的指向内存地址的指针，而是把数据存到到`isa`的部分位内，并且将运行时需要的标识存放于其他位置。仅在数据量超过范围后，才转变为真正的指向内存地址的指针。这种处理极大地提高了嵌入式设备不需要大量运算的使用场景的运行效率。
+**总结：**`nonpointer isa`的内存优化，本质上，是缩减类指针地址在较低数值的时候在内存读写时的消耗，并不是一个正常的指向内存地址的指针，而是把类指针地址存到到`isa`的部分位内，并且将运行时需要的标识存放于其他位置。仅在类指针地址超过范围后，才转变为真正的指向内存地址的指针。这种处理极大地提高了嵌入式设备不需要大量运算的使用场景的运行效率。
+
+## 2.4 `objc_class`
+
+&emsp;&emsp;
+
+## 2.5 `SideTable`
+
+&emsp;&emsp;
 
 # 3. 宏观
 
