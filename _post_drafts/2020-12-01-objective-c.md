@@ -715,7 +715,7 @@ _objc_getTaggedPointerSignedValue(const void * _Nullable ptr)
 
 &emsp;&emsp;从`ISA_BITFIELD`中，逐个查看他们的作用。
 
-1. `nonpointer`，第1bit，区分`isa`是否使用`nonpointer isa`，`isa`是个`union`，在使用`nonpointer`的情况下，先以0值初始化，然后根据`nonpointer isa`内结构体的位进行默认赋值。没有使用的情况下，`isa`的初始化就是正常的一个指针。在`struct objc_object`的私有初始化函数中可以看到其实现：
+1. `nonpointer`，[0]bit，区分`isa`是否使用`nonpointer isa`，`isa`是个`union`，在使用`nonpointer`的情况下，先以0值初始化，然后根据`nonpointer isa`内结构体的位进行默认赋值。没有使用的情况下，`isa`的初始化就是正常的一个指针。在`struct objc_object`的私有初始化函数中可以看到其实现：
    ```ObjC
     inline void 
     objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor) 
@@ -755,7 +755,7 @@ _objc_getTaggedPointerSignedValue(const void * _Nullable ptr)
         }
     }
    ```
-2. `has_assoc`，第2bit，在使用`nonpointer isa`的情况下，区分是否有联合对象（Association Object），相关函数如下：
+2. `has_assoc`，[1]bit，在使用`nonpointer isa`的情况下，区分是否有联合对象（Association Object），相关函数如下：
    ```ObjC
    inline bool
     objc_object::hasAssociatedObjects()
@@ -782,13 +782,13 @@ _objc_getTaggedPointerSignedValue(const void * _Nullable ptr)
         if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
     }
    ```
-3. `has_cxx_dtor`，
-4. `shiftcls`，
-5. `magic`，
-6. `weakly_referenced`，
-7. `deallocating`，
-8. `has_sidetable_rc`，
-9. `extra_rc`，
+3. `has_cxx_dtor`，[2]bit，在使用`nonpointer isa`的情况下，区分是否有C++的析构函数，出于改变`isa`指针、初始化与释放等场景的需要
+4. `shiftcls`，[3]~[36]bit，在使用`nonpointer isa`的情况下，存放真正的数据
+5. `magic`，[37]～[42]bit，在使用`nonpointer isa`的情况下，存放魔术数，也用于区分数据是否已初始化
+6. `weakly_referenced`，[43]bit，在使用`nonpointer isa`的情况下，是否有被弱引用，决定释放的时候，是否需要到`SideTable`中处理引用问题
+7. `deallocating`，[44]bit，在使用`nonpointer isa`的情况下，是否正在释放的标识位
+8. `has_sidetable_rc`，[45]bit，在使用`nonpointer isa`的情况下，是否有`SideTable`的引用计数
+9. `extra_rc`，[46]~[64]bit，在使用`nonpointer isa`的情况下，少量引用计数量的存放位，计算引用计数时加一，即（extra_rc + 1）
 
 &emsp;&emsp;`nonpointer isa`这种内存优化方式只在数据量在提供的bit能表达的情况下使用，当数据量超过了提供的bit能表达的数量时，就会切换为正常的指针。这些都是运行时进行的，这体现了`objc`提供出来的运行时特性，具体的实现函数如下：
 ```ObjC
@@ -872,18 +872,20 @@ objc_object::changeIsa(Class newCls)
     }
 }
 ```
-
+**总结：**`nonpointer isa`的内存有话，本质上，是缩减数据量少的时候在内存读写时的消耗，与`Tagged Pointer`的优化相似，并不是一个正常的指向内存地址的指针，而是把数据存到到`isa`的部分位内，并且将运行时需要的标识存放于其他位置。仅在数据量超过范围后，才转变为真正的指向内存地址的指针。这种处理极大地提高了嵌入式设备不需要大量运算的使用场景的运行效率。
 
 # 3. 宏观
 
 &emsp;&emsp;从`objc_object`到`NSObject`，联系都在这里。
 
-## 3.1 `SEL` & `IMP`
+## 3.1 Reference count
 
-## 3.2 Property
+## 3.2 `SEL` & `IMP`
 
-## 3.3 Category
+## 3.3 Property
 
-## 3.4 Association
+## 3.4 Category
 
-## 3.5 Autoreleasepool
+## 3.5 Association
+
+## 3.6 Autoreleasepool
