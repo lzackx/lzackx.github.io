@@ -872,11 +872,37 @@ objc_object::changeIsa(Class newCls)
     }
 }
 ```
-**总结：**`nonpointer isa`的内存优化，本质上，是缩减类指针地址在较低数值的时候在内存读写时的消耗，并不是一个正常的指向内存地址的指针，而是把类指针地址存到到`isa`的部分位内，并且将运行时需要的标识存放于其他位置。仅在类指针地址超过范围后，才转变为真正的指向内存地址的指针。这种处理极大地提高了嵌入式设备不需要大量运算的使用场景的运行效率。
+**总结：**`nonpointer isa`的内存优化，本质上，是缩减类指针地址在较低数值的时候在内存读写时的消耗，并不是一个正常的指向内存地址的指针，而是把类指针地址存到到`isa`的部分位内，并且将运行时需要的标识存放于其他位置。仅在类指针地址超过范围后，才转变为真正的指向内存地址的指针，从代码注释中看到`MACH_VM_MAX_ADDRESS 0x1000000000`，占用的是36bit地址位，33位的`nonpointer isa`类地址能处理绝大多数的场景了。这种处理极大地提高了嵌入式设备不需要大量运算的使用场景的运行效率。
 
 ## 2.4 `objc_class`
 
-&emsp;&emsp;
+&emsp;&emsp;`struct objc_class`继承自`struct objc_object`，有上述所说`objc_object`的所有特点。
+
+&emsp;&emsp;同时，类型指针别名为`Class`，它就是`Objective-C`中的`类`的数据结构体。
+
+&emsp;&emsp;结构体声明位于`objc-runtime-new.h`文件中，BTW，`objc.h`中的对外暴露的声明，使用的是此处的代码，而非`runtime.h`内的，注意观察宏的值。
+
+&emsp;&emsp;`struct objc_class`与`struct objc_object`的关系是双辅双成的，内部的函数实现，都有使用双方的数据，以这个作为认知前提，可以再理一下`struct objc_class`处理了什么。先看内部的变量：
+
+```ObjC
+struct objc_class : objc_object {
+    // Class ISA;
+    Class superclass;
+    cache_t cache;             // formerly cache pointer and vtable
+    class_data_bits_t bits;    // class_rw_t * plus custom rr/alloc flags
+
+    /*
+        ...
+    */
+}
+```
+
+1. `ISA`，来自于`objc_object`的私有变量，通过函数获取`isa`私有变量内的类指针，有2种情况：
+   1. 使用`nonpointer isa`的情况，获取时，`objc_object`的`ISA`函数内，会通过`ISA_MASK`提供真正的类地址
+   2. 使用正常指针的情况，获取时，`objc_object`的`rawISA`函数内获取`isa`的所有bit作为类的地址
+2. `superclass`，父类，
+3. `cache`，
+4. `bits`，
 
 ## 2.5 `SideTable`
 
