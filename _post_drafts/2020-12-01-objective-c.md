@@ -900,8 +900,12 @@ struct objc_class : objc_object {
 1. `ISA`，来自于`objc_object`的私有变量，通过函数获取`isa`私有变量内的类指针，有2种情况：
    1. 使用`nonpointer isa`的情况，获取时，`objc_object`的`ISA`函数内，会通过`ISA_MASK`提供真正的类地址
    2. 使用正常指针的情况，获取时，`objc_object`的`rawISA`函数内获取`isa`的所有bit作为类的地址
-2. `superclass`，父类，也是`objc_class`，用于网上追溯父类的指针，关于`isa`的指向关系图，经常可以看见，如下，
-   ![isa](https://github.com/lzackx/lzackx.github.io/blob/master/images/2020-12-01-objective-c-isa.png?raw=true)
+2. `superclass`，父类，也是`objc_class`，用于追溯父类的指针，关于`isa`的指向关系图，早有被广泛使用，如下，
+   1. `isa`
+      1. 实例对象的`isa`指针指向的是生成它的类，在分析`isa`章节的时候就提及到，使用的是`initInstanceIsa`函数
+      2. 而类本身也是`objc_object`，它由meta类初始化，使用的是`initClassIsa`函数，BTW，meta类本身也是`objc_class`，但不论平台是否支持`isa`，使用的都是`rawISA`，即正常的地址指针。
+      3. 
+   ![isa]({{site.url}}/../../images/2020-12-01-objective-c-isa.png)
 3. `cache`，
 4. `bits`，
 
