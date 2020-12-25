@@ -903,8 +903,15 @@ struct objc_class : objc_object {
 2. `superclass`，父类，也是`objc_class`，用于追溯父类的指针，关于`isa`的指向关系图，早有被广泛使用，如下，
    1. `isa`
       1. 实例对象的`isa`指针指向的是生成它的类，在分析`isa`章节的时候就提及到，使用的是`initInstanceIsa`函数
-      2. 而类本身也是`objc_object`，它由meta类初始化，使用的是`initClassIsa`函数，BTW，meta类本身也是`objc_class`，但不论平台是否支持`isa`，使用的都是`rawISA`，即正常的地址指针。
-      3. 
+      2. 而类本身也是`objc_object`，它由meta类初始化，使用的是`initClassIsa`函数，BTW，meta类本身也是`objc_class`，但不论平台是否支持`isa`，使用的都是`rawISA`，即正常的没有内存优化的指针
+   2. `superclass`
+      1. `Objective-C`中继承关系的实现基础，此变量的目的就是为了给`objc_class`追溯父类，查找父类拥有的成员（如变量、函数，协议）
+      2. 当`superclass`为nil时，说明这个类已经是根类了
+   3. `isa`与`superclass`
+      1. 通过`objc_object`内函数的理解，知道每一个`isa`都是通过`objc_class`（别名`Class`）来初始化的，而因为初始化`isa`的函数实现也只是决定用不用和怎么用优化内存来记录`objc_class`的地址，所以`isa`其实就是个指向生成`isa`的那个`objc_class`的地址的指针，也就是图中虚线的意思
+      2. 查看`struct objc_class`，知道继承自`struct objc_object`，那么每一个`Class`也是一个`id`
+         1. `Objective-C`中的实例对象的属性和方法并不是由`struct objc_object`记录的，而是生成实例对象的类，所以实例对象的`isa`指向了能初始化实例对象的类，即`struct objc_class`，这样实例对象就能查找自己有什么属性和方法了
+         2. 
    ![isa]({{site.url}}/../../images/2020-12-01-objective-c-isa.png)
 3. `cache`，
 4. `bits`，
