@@ -901,6 +901,7 @@ struct objc_class : objc_object {
    1. 使用`nonpointer isa`的情况，获取时，`objc_object`的`ISA`函数内，会通过`ISA_MASK`提供真正的类地址
    2. 使用正常指针的情况，获取时，`objc_object`的`rawISA`函数内获取`isa`的所有bit作为类的地址
 2. `superclass`，父类，也是`objc_class`，用于追溯父类的指针，关于`isa`的指向关系图，早有被广泛使用，如下，
+   ![isa]({{site.url}}/../../images/2020-12-01-objective-c-isa.png)
    1. `isa`
       1. 实例对象的`isa`指针指向的是生成它的类，在分析`isa`章节的时候就提及到，使用的是`initInstanceIsa`函数
       2. 而类本身也是`objc_object`，它由meta类初始化，使用的是`initClassIsa`函数，BTW，meta类本身也是`objc_class`，但不论平台是否支持`isa`，使用的都是`rawISA`，即正常的没有内存优化的指针
@@ -909,10 +910,156 @@ struct objc_class : objc_object {
       2. 当`superclass`为nil时，说明这个类已经是根类了
    3. `isa`与`superclass`
       1. 通过`objc_object`内函数的理解，知道每一个`isa`都是通过`objc_class`（别名`Class`）来初始化的，而因为初始化`isa`的函数实现也只是决定用不用和怎么用优化内存来记录`objc_class`的地址，所以`isa`其实就是个指向生成`isa`的那个`objc_class`的地址的指针，也就是图中虚线的意思
-      2. 查看`struct objc_class`，知道继承自`struct objc_object`，那么每一个`Class`也是一个`id`
-         1. `Objective-C`中的实例对象的属性和方法并不是由`struct objc_object`记录的，而是生成实例对象的类，所以实例对象的`isa`指向了能初始化实例对象的类，即`struct objc_class`，这样实例对象就能查找自己有什么属性和方法了
-         2. 
-   ![isa]({{site.url}}/../../images/2020-12-01-objective-c-isa.png)
+      2. 查看`struct objc_class`，知道继承自`struct objc_object`，那么每一个`Class`也是一个`id`，`Objective-C`中的实例对象的属性和方法并不是由`struct objc_object`记录的，而是生成实例对象的类，所以实例对象的`isa`指向了能初始化实例对象的类，即`struct objc_class`，这样实例对象就能查找自己有什么属性和方法了
+      3. 此图的相关逻辑由一个`runtime`函数实现：`objc_allocateClassPair`，位于`objc-runtime-new.mm`文件中，如下，初始化时，开辟2个空间，一个是`Class`自己，一个是`Class(meta)`，接着各自设置`struct objc_class`内的数据，然后互相建立联系，最后添加进类表里。
+         1. 在建立联系的过程中，`Class`调用`initClassIsa`函数初始化`isa`指针，参数是`Class(meta)`，所以可以很清晰地知道`Class`的`isa`指向`Class(meta)`
+         2. 如果`Class`没有父`Class`，会分开判断，将`Class(meta)`内的`supercls`变量赋值为`Class`，而`Class`的`supercls`赋值为`Nil`
+         3. 如果`Class`有父`Class`，那么`supercls`就是父`Class`，而`Class(meta)`则是`supercls`的`isa`
+    ```ObjC
+    static Class 
+    alloc_class_for_subclass(Class supercls, size_t extraBytes)
+    {
+        if (!supercls  ||  !supercls->isAnySwift()) {
+            return _calloc_class(sizeof(objc_class) + extraBytes);
+        }
+
+        /*
+            objc4中对Swift兼容的处理此处忽略
+        */
+    }
+
+    // &UnsetLayout is the default ivar layout during class construction
+    static const uint8_t UnsetLayout = 0;
+
+    static void objc_initializeClassPair_internal(Class superclass, const char *name, Class cls, Class meta)
+    {
+        runtimeLock.assertLocked();
+
+        class_ro_t *cls_ro_w, *meta_ro_w;
+        class_rw_t *cls_rw_w, *meta_rw_w;
+        
+        cls_rw_w   = objc::zalloc<class_rw_t>();
+        meta_rw_w  = objc::zalloc<class_rw_t>();
+        cls_ro_w   = (class_ro_t *)calloc(sizeof(class_ro_t), 1);
+        meta_ro_w  = (class_ro_t *)calloc(sizeof(class_ro_t), 1);
+
+        cls->setData(cls_rw_w);
+        cls_rw_w->set_ro(cls_ro_w);
+        meta->setData(meta_rw_w);
+        meta_rw_w->set_ro(meta_ro_w);
+
+        // Set basic info
+
+        cls_rw_w->flags = RW_CONSTRUCTING | RW_COPIED_RO | RW_REALIZED | RW_REALIZING;
+        meta_rw_w->flags = RW_CONSTRUCTING | RW_COPIED_RO | RW_REALIZED | RW_REALIZING | RW_META;
+
+        cls_ro_w->flags = 0;
+        meta_ro_w->flags = RO_META;
+        if (superclass) {
+            uint32_t flagsToCopy = RW_FORBIDS_ASSOCIATED_OBJECTS;
+            cls_rw_w->flags |= superclass->data()->flags & flagsToCopy;
+            cls_ro_w->instanceStart = superclass->unalignedInstanceSize();
+            meta_ro_w->instanceStart = superclass->ISA()->unalignedInstanceSize();
+            cls->setInstanceSize(cls_ro_w->instanceStart);
+            meta->setInstanceSize(meta_ro_w->instanceStart);
+        } else {
+            cls_ro_w->flags |= RO_ROOT;
+            meta_ro_w->flags |= RO_ROOT;
+            cls_ro_w->instanceStart = 0;
+            meta_ro_w->instanceStart = (uint32_t)sizeof(objc_class);
+            cls->setInstanceSize((uint32_t)sizeof(id));  // just an isa
+            meta->setInstanceSize(meta_ro_w->instanceStart);
+        }
+
+        cls_ro_w->name = strdupIfMutable(name);
+        meta_ro_w->name = strdupIfMutable(name);
+
+        cls_ro_w->ivarLayout = &UnsetLayout;
+        cls_ro_w->weakIvarLayout = &UnsetLayout;
+
+        meta->chooseClassArrayIndex();
+        cls->chooseClassArrayIndex();
+
+        // This absolutely needs to be done before addSubclass
+        // as initializeToEmpty() clobbers the FAST_CACHE bits
+        cls->cache.initializeToEmpty();
+        meta->cache.initializeToEmpty();
+
+    #if FAST_CACHE_META
+        meta->cache.setBit(FAST_CACHE_META);
+    #endif
+        meta->setInstancesRequireRawIsa();
+
+        // Connect to superclasses and metaclasses
+        cls->initClassIsa(meta);
+
+        if (superclass) {
+            meta->initClassIsa(superclass->ISA()->ISA());
+            cls->superclass = superclass;
+            meta->superclass = superclass->ISA();
+            addSubclass(superclass, cls);
+            addSubclass(superclass->ISA(), meta);
+        } else {
+            meta->initClassIsa(meta);
+            cls->superclass = Nil;
+            meta->superclass = cls;
+            addRootClass(cls);
+            addSubclass(cls, meta);
+        }
+
+        addClassTableEntry(cls);
+    }
+    /***********************************************************************
+   * addClassTableEntry
+   * Add a class to the table of all classes. If addMeta is true,
+   * automatically adds the metaclass of the class as well.
+   * Locking: runtimeLock must be held by the caller.
+   **********************************************************************/
+   static void
+   addClassTableEntry(Class cls, bool addMeta = true)
+   {
+       runtimeLock.assertLocked();
+
+       // This class is allowed to be a known class via the shared cache or via
+       // data segments, but it is not allowed to be in the dynamic table already.
+       auto &set = objc::allocatedClasses.get();
+
+       ASSERT(set.find(cls) == set.end());
+
+       if (!isKnownClass(cls))
+           set.insert(cls);
+       if (addMeta)
+           addClassTableEntry(cls->ISA(), false);
+   }
+
+    Class objc_allocateClassPair(Class superclass, const char *name, 
+                            size_t extraBytes)
+    {
+        Class cls, meta;
+
+        // Fail if the class name is in use.
+        if (look_up_class(name, NO, NO)) return nil;
+
+        mutex_locker_t lock(runtimeLock);
+
+        // Fail if the class name is in use.
+        // Fail if the superclass isn't kosher.
+        if (getClassExceptSomeSwift(name)  ||
+            !verifySuperclass(superclass, true/*rootOK*/))
+        {
+            return nil;
+        }
+
+        // Allocate new classes.
+        cls  = alloc_class_for_subclass(superclass, extraBytes);
+        meta = alloc_class_for_subclass(superclass, extraBytes);
+
+        // fixme mangle the name if it looks swift-y?
+        objc_initializeClassPair_internal(superclass, name, cls, meta);
+
+        return cls;
+    }
+    ```
 3. `cache`，
 4. `bits`，
 
