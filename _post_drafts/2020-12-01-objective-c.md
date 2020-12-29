@@ -904,7 +904,7 @@ struct objc_class : objc_object {
    ![isa]({{site.url}}/../../images/2020-12-01-objective-c-isa.png)
    1. `isa`
       1. 实例对象的`isa`指针指向的是生成它的类，在分析`isa`章节的时候就提及到，使用的是`initInstanceIsa`函数
-      2. 而类本身也是`objc_object`，它由meta类初始化，使用的是`initClassIsa`函数，BTW，meta类本身也是`objc_class`，但不论平台是否支持`isa`，使用的都是`rawISA`，即正常的没有内存优化的指针
+      2. 而类本身也是`objc_object`，使用的是`initClassIsa`函数，BTW，meta类本身也是`objc_class`，但不论平台是否支持`isa`，使用的都是`rawISA`，即正常的没有内存优化的指针
    2. `superclass`
       1. `Objective-C`中继承关系的实现基础，此变量的目的就是为了给`objc_class`追溯父类，查找父类拥有的成员（如变量、函数，协议）
       2. 当`superclass`为nil时，说明这个类已经是根类了
@@ -913,8 +913,8 @@ struct objc_class : objc_object {
       2. 查看`struct objc_class`，知道继承自`struct objc_object`，那么每一个`Class`也是一个`id`，`Objective-C`中的实例对象的属性和方法并不是由`struct objc_object`记录的，而是生成实例对象的类，所以实例对象的`isa`指向了能初始化实例对象的类，即`struct objc_class`，这样实例对象就能查找自己有什么属性和方法了
       3. 此图的相关逻辑由一个`runtime`函数实现：`objc_allocateClassPair`，位于`objc-runtime-new.mm`文件中，如下，初始化时，开辟2个空间，一个是`Class`自己，一个是`Class(meta)`，接着各自设置`struct objc_class`内的数据，然后互相建立联系，最后添加进类表里。
          1. 在建立联系的过程中，`Class`调用`initClassIsa`函数初始化`isa`指针，参数是`Class(meta)`，所以可以很清晰地知道`Class`的`isa`指向`Class(meta)`
-         2. 如果`Class`没有父`Class`，会分开判断，将`Class(meta)`内的`supercls`变量赋值为`Class`，而`Class`的`supercls`赋值为`Nil`
-         3. 如果`Class`有父`Class`，那么`supercls`就是父`Class`，而`Class(meta)`则是`supercls`的`isa`
+         2. 如果`Class`没有父`Class`，会分开判断，将`Class(meta)`内的`supercls`变量赋值为`Class`，而`Class`的`supercls`赋值为`Nil`，`Class(meta)`的`isa`是自己
+         3. 如果`Class`有父`Class`，那么`supercls`就是父`Class`，而`Class(meta)`则是`supercls`的`isa`，`Class(meta)`的`isa`是父`Class`的`Class(meta)`的`Class(meta)`，即`Root Class(meta)`
     ```ObjC
     static Class 
     alloc_class_for_subclass(Class supercls, size_t extraBytes)
@@ -1060,7 +1060,131 @@ struct objc_class : objc_object {
         return cls;
     }
     ```
-3. `cache`，
+3. `cache`，常用方法缓存，用于优化常用方法的寻找速度，通过`struct cache_t`内函数对`struct bucket_t`进行管理
+   1. `CACHE_MASK_STORAGE`宏（定义位于`objc-config.h`中）在64位iPhoneOS中，值为 `CACHE_MASK_STORAGE_HIGH_16`，即高16位掩码
+   2. `struct cache_t`，如下，与`nonpointer isa`的优化相似，`_maskAndBuckets`内保存着`bucket_t`的地址、4位用于`msgSend`的0位和16位的高位掩码，其中，16位掩码用于获取`bucket`的容量，同时也是`bucket`数量的最大值，即缓存方法数量的最大值
+    ```ObjC
+    struct cache_t {
+    #if CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_OUTLINED
+        /*
+            ...
+        */
+    #elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_HIGH_16
+        explicit_atomic<uintptr_t> _maskAndBuckets;
+        mask_t _mask_unused;
+        
+        // How much the mask is shifted by.
+        static constexpr uintptr_t maskShift = 48;
+        
+        // Additional bits after the mask which must be zero. msgSend
+        // takes advantage of these additional bits to construct the value
+        // `mask << 4` from `_maskAndBuckets` in a single instruction.
+        static constexpr uintptr_t maskZeroBits = 4;
+        
+        // The largest mask value we can store.
+        static constexpr uintptr_t maxMask = ((uintptr_t)1 << (64 - maskShift)) - 1;
+        
+        // The mask applied to `_maskAndBuckets` to retrieve the buckets pointer.
+        static constexpr uintptr_t bucketsMask = ((uintptr_t)1 << (maskShift - maskZeroBits)) - 1;
+        
+        // Ensure we have enough bits for the buckets pointer.
+        static_assert(bucketsMask >= MACH_VM_MAX_ADDRESS, "Bucket field doesn't have enough bits for arbitrary pointers.");
+    #elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_LOW_4
+        /*
+            ...
+        */
+    #else
+    #error Unknown cache mask storage type.
+    #endif
+        
+    #if __LP64__
+        uint16_t _flags;
+    #endif
+        uint16_t _occupied;
+
+    public:
+        static bucket_t *emptyBuckets();
+        
+        struct bucket_t *buckets();
+        mask_t mask();
+        mask_t occupied();
+        void incrementOccupied();
+        void setBucketsAndMask(struct bucket_t *newBuckets, mask_t newMask);
+        void initializeToEmpty();
+
+        unsigned capacity();
+        bool isConstantEmptyCache();
+        bool canBeFreed();
+
+    /*
+        忽略一些对 _flag 的处理
+    */
+
+        static size_t bytesForCapacity(uint32_t cap);
+        static struct bucket_t * endMarker(struct bucket_t *b, uint32_t cap);
+
+        void reallocate(mask_t oldCapacity, mask_t newCapacity, bool freeOld);
+        void insert(Class cls, SEL sel, IMP imp, id receiver);
+
+        static void bad_cache(id receiver, SEL sel, Class isa) __attribute__((noreturn, cold));
+    };
+    ```
+      1. 缓存细节如下，
+   ```ObjC
+    ALWAYS_INLINE
+    void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver)
+    {
+    #if CONFIG_USE_CACHE_LOCK
+        cacheUpdateLock.assertLocked();
+    #else
+        runtimeLock.assertLocked();
+    #endif
+
+        ASSERT(sel != 0 && cls->isInitialized());
+
+        // Use the cache as-is if it is less than 3/4 full
+        mask_t newOccupied = occupied() + 1;
+        unsigned oldCapacity = capacity(), capacity = oldCapacity;
+        if (slowpath(isConstantEmptyCache())) {
+            // Cache is read-only. Replace it.
+            if (!capacity) capacity = INIT_CACHE_SIZE;
+            reallocate(oldCapacity, capacity, /* freeOld */false);
+        }
+        else if (fastpath(newOccupied + CACHE_END_MARKER <= capacity / 4 * 3)) {
+            // Cache is less than 3/4 full. Use it as-is.
+        }
+        else {
+            capacity = capacity ? capacity * 2 : INIT_CACHE_SIZE;
+            if (capacity > MAX_CACHE_SIZE) {
+                capacity = MAX_CACHE_SIZE;
+            }
+            reallocate(oldCapacity, capacity, true);
+        }
+
+        bucket_t *b = buckets();
+        mask_t m = capacity - 1;
+        mask_t begin = cache_hash(sel, m);
+        mask_t i = begin;
+
+        // Scan for the first unused slot and insert there.
+        // There is guaranteed to be an empty slot because the
+        // minimum size is 4 and we resized at 3/4 full.
+        do {
+            if (fastpath(b[i].sel() == 0)) {
+                incrementOccupied();
+                b[i].set<Atomic, Encoded>(sel, imp, cls);
+                return;
+            }
+            if (b[i].sel() == sel) {
+                // The entry was added to the cache by some other thread
+                // before we grabbed the cacheUpdateLock.
+                return;
+            }
+        } while (fastpath((i = cache_next(i, m)) != begin));
+
+        cache_t::bad_cache(receiver, (SEL)sel, cls);
+    }
+   ```
 4. `bits`，
 
 ## 2.5 `SideTable`
