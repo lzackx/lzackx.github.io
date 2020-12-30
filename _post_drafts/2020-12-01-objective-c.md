@@ -1129,7 +1129,13 @@ struct objc_class : objc_object {
         static void bad_cache(id receiver, SEL sel, Class isa) __attribute__((noreturn, cold));
     };
     ```
-      1. 缓存细节如下，
+   3. 缓存方法时，会调用`insert`函数，如下，
+      1. 处理缓存的数量
+      2. 根据已缓存容量调整插入后的容量大小，注意到`reallocate`函数，调整缓存空间大小的时候，旧的缓存不会跟随到新的缓存内的，而是会被收集释放(根据参数判断调用`cache_collect_free`函数)，所以每次调整缓存容量（空缓存情况除外）后，都是从0开始重新缓存方法
+         1. 已有缓存为0时，不释放空缓存，替换其为初始化的`INIT_CACHE_SIZE`，即（1 << 2）4容量的缓存空间
+         2. 已有缓存不超过容量的 3/4 时，不需要处理缓存容量空间
+         3. 已有缓存超过容量的 3/4 时，容量扩充2倍，但不超过最大可缓存容量`MAX_CACHE_SIZE`，即（1 << 16）上面提及到的16位掩码能表达的最大值
+      3. 通过循环寻找容量范围内的空位插入，如果循环结束还找不到空位插入，调用`bad_cache`，记录崩溃前的日志
    ```ObjC
     ALWAYS_INLINE
     void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver)
@@ -1185,7 +1191,158 @@ struct objc_class : objc_object {
         cache_t::bad_cache(receiver, (SEL)sel, cls);
     }
    ```
-4. `bits`，
+4. `bits`，`struct class_data_bits_t`类型，ObjC中的类内部内容就存放在这里了，包括变量、属性、方法、遵循的协议
+   1. `struct class_data_bits_t`，如下
+      1. `struct objc_class`是`struct class_data_bits_t`的友元结构体，可以访问内部的私有函数
+      2. 内嵌一个`bits`变量，同样是为了优化内存，通过掩码方式存放数据获
+         1. [0]bit，Swift的ABI稳定前的标识位
+         2. [1]bit，Swift的ABI稳定版本的标识位
+         3. [2]bit, 类中有默认`RR`的标识位
+         4. [3]~[46]bit，取`class_rw_t`类型的数据指针，共44位
+    ```ObjC
+        /*
+            ...
+        */
+        
+        // class is a Swift class from the pre-stable Swift ABI
+        #define FAST_IS_SWIFT_LEGACY    (1UL<<0)
+        // class is a Swift class from the stable Swift ABI
+        #define FAST_IS_SWIFT_STABLE    (1UL<<1)
+        // class or superclass has default retain/release/autorelease/retainCount/
+        //   _tryRetain/_isDeallocating/retainWeakReference/allowsWeakReference
+        #define FAST_HAS_DEFAULT_RR     (1UL<<2)
+        // data pointer
+        #define FAST_DATA_MASK          0x00007ffffffffff8UL
+
+        /*
+            ...
+        */
+
+        struct class_data_bits_t {
+            friend objc_class;
+
+            // Values are the FAST_ flags above.
+            uintptr_t bits;
+            /*
+                ...
+            */
+            public:
+
+            class_rw_t* data() const {
+                return (class_rw_t *)(bits & FAST_DATA_MASK);
+            }
+            void setData(class_rw_t *newData)
+            {
+                ASSERT(!data()  ||  (newData->flags & (RW_REALIZING | RW_FUTURE)));
+                // Set during realization or construction only. No locking needed.
+                // Use a store-release fence because there may be concurrent
+                // readers of data and data's contents.
+                uintptr_t newBits = (bits & ~FAST_DATA_MASK) | (uintptr_t)newData;
+                atomic_thread_fence(memory_order_release);
+                bits = newBits;
+            }
+
+            // Get the class's ro data, even in the presence of concurrent realization.
+            // fixme this isn't really safe without a compiler barrier at least
+            // and probably a memory barrier when realizeClass changes the data field
+            const class_ro_t *safe_ro() {
+                class_rw_t *maybe_rw = data();
+                if (maybe_rw->flags & RW_REALIZED) {
+                    // maybe_rw is rw
+                    return maybe_rw->ro();
+                } else {
+                    // maybe_rw is actually ro
+                    return (class_ro_t *)maybe_rw;
+                }
+            }
+            /*
+                ...
+            */
+        };
+    ```
+   2. `struct class_rw_t`深入，如下：
+      1. `flags`，32bit的变量，用于存放类加载状态的标识，同时也根据加载状态判断以何种数据结构读取数据，其中`RW_REALIZED`即(1<<31)用于判断类是否已经实现
+      2. `witness`，用于快速判断类是否已经加载完毕
+      3. `firstSubclass`， 记录第一个子类，在自上而下的类实现的遍历中用到
+      4. `nextSiblingClass`，记录同父类的兄弟类，同样是在自上而下的类实现的遍历中用到
+      5. 定义泛型`objc::PointerUnion<const class_ro_t *, class_rw_ext_t *>`为`ro_or_rw_ext_t`类型，`objc::PointerUnion`是个指针联合体（可以理解为同一个放地址空间的内存空间内能存放不同类型但是使用同样父类类型的指针的一个数据结构，目的是方便判断和转换类型），通过判断类的实现状态读取`class_ro_t`内的数据。
+         1. 在类实现前，`struct class_data_bits_t`内的`bits`通过掩码获得的指针指向的就是`class_ro_t`，这时，`class_ro_t`同样存在的`flag`的`RW_REALIZED`掩码后值是0
+         2. 在类实现后，`struct class_data_bits_t`内的`bits`通过掩码获得的指针指向的是`class_rw_t`，这时，`class_rw_t`的`flag`的`RW_REALIZED`掩码后值是1，读取`class_ro_t`内的数据需要通过`class_rw_t`内的函数`ro`调用
+   ```ObjC
+    struct class_rw_t {
+        // Be warned that Symbolication knows the layout of this structure.
+        uint32_t flags;
+        uint16_t witness;
+        /*
+            ...
+        */
+        explicit_atomic<uintptr_t> ro_or_rw_ext;
+
+        Class firstSubclass;
+        Class nextSiblingClass;
+
+        private:
+        using ro_or_rw_ext_t = objc::PointerUnion<const class_ro_t *, class_rw_ext_t *>;
+
+        const ro_or_rw_ext_t get_ro_or_rwe() const {
+            return ro_or_rw_ext_t{ro_or_rw_ext};
+        }
+
+        void set_ro_or_rwe(const class_ro_t *ro) {
+            ro_or_rw_ext_t{ro}.storeAt(ro_or_rw_ext, memory_order_relaxed);
+        }
+
+        void set_ro_or_rwe(class_rw_ext_t *rwe, const class_ro_t *ro) {
+            // the release barrier is so that the class_rw_ext_t::ro initialization
+            // is visible to lockless readers
+            rwe->ro = ro;
+            ro_or_rw_ext_t{rwe}.storeAt(ro_or_rw_ext, memory_order_release);
+        }
+
+        class_rw_ext_t *extAlloc(const class_ro_t *ro, bool deep = false);
+
+        public:
+        
+        /*
+            ...
+        */
+    }
+   ```
+   1. `struct class_ro_t`深入，如下，内部存放了非常多的数据，这个结构体是真正的存放ObjC中使用到的变量、属性、方法、协议等数据的地方
+   ```ObjC
+    struct class_ro_t {
+        uint32_t flags;
+        uint32_t instanceStart;
+        uint32_t instanceSize;
+        #ifdef __LP64__
+        uint32_t reserved;
+        #endif
+
+        const uint8_t * ivarLayout;
+
+        const char * name;
+        method_list_t * baseMethodList;
+        protocol_list_t * baseProtocols;
+        const ivar_list_t * ivars;
+
+        const uint8_t * weakIvarLayout;
+        property_list_t *baseProperties;
+
+        /*
+            ...
+        */
+    };
+   ```
+      1. `flags`，32bit的标识位，记录`struct class_ro_t`的class状态，具体标识意思可以通过位于`objc-runtime-new.h`内的宏查到
+      2. `instanceStart`，实例对象的起始内存位置，根类位置为0，与父类对象保持相对位置的存放关系
+      3. `instanceSize`，实例对象的大小，子类会获得父类的大小
+   
+
+
+**总结：**`struct objc_class`在继承了`struct objc_object`特性的情况下，增加了对象的关系处理，
+1. 通过`isa`与`superclass`联通了实例对象、类、元类，为运行时的消息转发提供了基础
+2. 通过`cache`缓存常用方法，优化调用方法的速度
+3. 通过`bits`存放变量、属性、方法、遵循的协议及相关的管理函数，在缓存中找不到的方法，就会在这里找
 
 ## 2.5 `SideTable`
 
