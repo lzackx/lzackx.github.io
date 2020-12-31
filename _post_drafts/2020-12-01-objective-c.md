@@ -1334,8 +1334,10 @@ struct objc_class : objc_object {
     };
    ```
       1. `flags`，32bit的标识位，记录`struct class_ro_t`的class状态，具体标识意思可以通过位于`objc-runtime-new.h`内的宏查到
-      2. `instanceStart`，实例对象的起始内存位置，根类位置为0，与父类对象保持相对位置的存放关系
-      3. `instanceSize`，实例对象的大小，子类会获得父类的大小
+      2. `instanceStart`，实例对象的起始内存位置，根类位置为0，与父类对象保持相对位置的存放关系，当父类调整了对象大小后，实例对象的起始位置也要跟着改变
+      3. `instanceSize`，实例对象的大小，子类对象会获得父类对象的大小
+      4. `reserved`，64位处理器的保留位
+      5. 
    
 
 
