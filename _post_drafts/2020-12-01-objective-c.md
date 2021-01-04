@@ -1268,6 +1268,7 @@ struct objc_class : objc_object {
       5. 定义泛型`objc::PointerUnion<const class_ro_t *, class_rw_ext_t *>`为`ro_or_rw_ext_t`类型，`objc::PointerUnion`是个指针联合体（可以理解为同一个放地址空间的内存空间内能存放不同类型但是使用同样父类类型的指针的一个数据结构，目的是方便判断和转换类型），通过判断类的实现状态读取`class_ro_t`内的数据。
          1. 在类实现前，`struct class_data_bits_t`内的`bits`通过掩码获得的指针指向的就是`class_ro_t`，这时，`class_ro_t`同样存在的`flag`的`RW_REALIZED`掩码后值是0
          2. 在类实现后，`struct class_data_bits_t`内的`bits`通过掩码获得的指针指向的是`class_rw_t`，这时，`class_rw_t`的`flag`的`RW_REALIZED`掩码后值是1，读取`class_ro_t`内的数据需要通过`class_rw_t`内的函数`ro`调用
+         3. 在编译后，`class_ro_t`内的数据就产生了，所以可以在类实现前就通过`class_ro_t`获得一些关于类的变量、方法、或协议，而在类的实现后，使用`class_rw_ext_t`类型，体现了runtime的特性，在运行时，会通过此类型获得类的的变量、方法、或协议
    ```ObjC
     struct class_rw_t {
         // Be warned that Symbolication knows the layout of this structure.
@@ -1337,8 +1338,33 @@ struct objc_class : objc_object {
       2. `instanceStart`，实例对象的起始内存位置，根类位置为0，与父类对象保持相对位置的存放关系，当父类调整了对象大小后，实例对象的起始位置也要跟着改变
       3. `instanceSize`，实例对象的大小，子类对象会获得父类对象的大小
       4. `reserved`，64位处理器的保留位
-      5. 
-   
+      5. `ivarLayout`，记录ObjC类中强引用变量的数量（该变量主要有也有弱引用变量的数量，但是在可以忽略的情况下会忽略掉）主要是强引用的变量，在寻找变量的时候，通过对齐地址的位移，获得各个变量的索引再获取变量
+      6. `name`，类名
+      7. `baseMethodList`，`entsize_list_tt`迭代器泛型模版类，元素类型为`method_t`，提供通过元素地址获取索引的函数
+      8. `baseProtocols`，`protocol_list_t`类型的迭代器，相较于`entsize_list_tt`迭代器少了操作符重载和掩码处理，内部真正的协议数据来自`protocol_ref_t`类型（即实际指向`struct protocol_t`，如下）的数组
+    ```ObjC
+    struct protocol_t : objc_object {
+        const char *mangledName;
+        struct protocol_list_t *protocols;
+        method_list_t *instanceMethods;
+        method_list_t *classMethods;
+        method_list_t *optionalInstanceMethods;
+        method_list_t *optionalClassMethods;
+        property_list_t *instanceProperties;
+        uint32_t size;   // sizeof(protocol_t)
+        uint32_t flags;
+        // Fields below this point are not always present on disk.
+        const char **_extendedMethodTypes;
+        const char *_demangledName;
+        property_list_t *_classProperties;
+        /*
+            ...
+        */
+    };
+    ```
+      1.  `ivars`，`entsize_list_tt`迭代器泛型模版类，元素类型为`ivar_t`，提供判断类中是否存在`ivar`的函数
+      2.  `weakIvarLayout`，记录ObjC类中弱饮用变量的数量，与`ivarLayout`对应，主要是若引用的变量，在寻找变量的时候，通过对齐地址的位移，获得各个变量的索引再获取变量
+      3.  `baseProperties`，`entsize_list_tt`迭代器泛型模版类，元素类型为`property_t`，只有属性名和类型描述
 
 
 **总结：**`struct objc_class`在继承了`struct objc_object`特性的情况下，增加了对象的关系处理，
