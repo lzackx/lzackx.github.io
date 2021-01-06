@@ -1374,7 +1374,201 @@ struct objc_class : objc_object {
 
 ## 2.5 `SideTable`
 
-&emsp;&emsp;
+&emsp;&emsp;`SideTable`用于记录引用计数，通过泛型模版`template<typename T> class StripedMap`包装成`SideTablesMap`，位于`Source/NSObject.mm`，如下，一旦初始化就持续使用不允许释放，通过`SideTables`函数获取C++引用实例使用
+```ObjC
+static objc::ExplicitInit<StripedMap<SideTable>> SideTablesMap;
+
+static StripedMap<SideTable>& SideTables() {
+    return SideTablesMap.get();
+}
+```
+
+&emsp;&emsp;先看看包装用的`template<typename T> class StripedMap`，如下，将`T`替换成`SideTable`来看待
+   1. `StripedMap`在iPhoneOS内只有8份`SideTable`，`objc_object`的引用计数是根据指针地址的位移操作后分配进`array`内的
+   2. `array`内的元素是`struct PaddedT`，对应内部的`value`其实就是`SideTable`类型的变量，并且是64位对齐的
+   3. `public`部分有操作符重载，用于通过`objc_object`地址获取对象引用计数，另外还有一些加锁操作，是`SideTable`内的自旋锁的外部调用接口
+```ObjC
+enum { CacheLineSize = 64 };
+
+// StripedMap<T> is a map of void* -> T, sized appropriately 
+// for cache-friendly lock striping. 
+// For example, this may be used as StripedMap<spinlock_t>
+// or as StripedMap<SomeStruct> where SomeStruct stores a spin lock.
+template<typename T>
+class StripedMap {
+#if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
+    enum { StripeCount = 8 };
+#else
+    /*
+        ...
+    */
+#endif
+
+    struct PaddedT {
+        T value alignas(CacheLineSize);
+    };
+
+    PaddedT array[StripeCount];
+
+    static unsigned int indexForPointer(const void *p) {
+        uintptr_t addr = reinterpret_cast<uintptr_t>(p);
+        return ((addr >> 4) ^ (addr >> 9)) % StripeCount;
+    }
+
+ public:
+    T& operator[] (const void *p) { 
+        return array[indexForPointer(p)].value; 
+    }
+    const T& operator[] (const void *p) const { 
+        return const_cast<StripedMap<T>>(this)[p]; 
+    }
+
+    // Shortcuts for StripedMaps of locks.
+    /*
+        锁操作函数
+    */
+};
+```
+
+&emsp;&emsp;再来看看`SideTable`，如下，
+```ObjC
+// RefcountMap disguises its pointers because we 
+// don't want the table to act as a root for `leaks`.
+typedef objc::DenseMap<DisguisedPtr<objc_object>,size_t,RefcountMapValuePurgeable> RefcountMap;
+
+/**
+ * The global weak references table. Stores object ids as keys,
+ * and weak_entry_t structs as their values.
+ */
+struct weak_table_t {
+    weak_entry_t *weak_entries;
+    size_t    num_entries;
+    uintptr_t mask;
+    uintptr_t max_hash_displacement;
+};
+
+struct SideTable {
+    spinlock_t slock;
+    RefcountMap refcnts;
+    weak_table_t weak_table;
+
+    SideTable() {
+        memset(&weak_table, 0, sizeof(weak_table));
+    }
+
+    ~SideTable() {
+        _objc_fatal("Do not delete SideTable.");
+    }
+
+    /*
+        锁操作
+    */
+};
+```
+
+1. `slock`对应外部调用的自旋锁
+2. `refcnts`，引用计数，`RefcountMap`类型，通过泛型模版`DenseMap`创建，模版有5个参数，前2个是key、value，后3个对前2个补充且有默认的泛型模版
+   1. `RefcountMap`中的key是`DisguisedPtr<objc_object>`，即伪装了的`struct objc_object`指针，
+   2. `RefcountMap`中的value是`size_t`，记录引用计数的多少
+3. `weak_table`，弱引用表，`weak_table_t`类型，位于`objc-weak.h`，相关数据结构如下：
+   1. `weak_entries`，`weak_entry_t`类型，用于记录弱引用关系，
+      1. 被弱引用的对象地址通过`DisguisedPtr<objc_object>`存储，
+      2. 引用它的对象通过联合体读取，
+         1. 小于4个时，使用内联数组，充分优化内存
+         2. 大于4个时，使用哈希表，在iPhoneOS中，最多可记录`2^62`个弱引用
+```ObjC
+/*
+    ...
+*/
+
+// The address of a __weak variable.
+// These pointers are stored disguised so memory analysis tools
+// don't see lots of interior pointers from the weak table into objects.
+typedef DisguisedPtr<objc_object *> weak_referrer_t;
+
+#if __LP64__
+#define PTR_MINUS_2 62
+#else
+#define PTR_MINUS_2 30
+#endif
+
+/**
+ * The internal structure stored in the weak references table. 
+ * It maintains and stores
+ * a hash set of weak references pointing to an object.
+ * If out_of_line_ness != REFERRERS_OUT_OF_LINE then the set
+ * is instead a small inline array.
+ */
+#define WEAK_INLINE_COUNT 4
+
+// out_of_line_ness field overlaps with the low two bits of inline_referrers[1].
+// inline_referrers[1] is a DisguisedPtr of a pointer-aligned address.
+// The low two bits of a pointer-aligned DisguisedPtr will always be 0b00
+// (disguised nil or 0x80..00) or 0b11 (any other address).
+// Therefore out_of_line_ness == 0b10 is used to mark the out-of-line state.
+#define REFERRERS_OUT_OF_LINE 2
+
+struct weak_entry_t {
+    DisguisedPtr<objc_object> referent;
+    union {
+        struct {
+            weak_referrer_t *referrers;
+            uintptr_t        out_of_line_ness : 2;
+            uintptr_t        num_refs : PTR_MINUS_2;
+            uintptr_t        mask;
+            uintptr_t        max_hash_displacement;
+        };
+        struct {
+            // out_of_line_ness field is low bits of inline_referrers[1]
+            weak_referrer_t  inline_referrers[WEAK_INLINE_COUNT];
+        };
+    };
+
+    bool out_of_line() {
+        return (out_of_line_ness == REFERRERS_OUT_OF_LINE);
+    }
+
+    weak_entry_t& operator=(const weak_entry_t& other) {
+        memcpy(this, &other, sizeof(other));
+        return *this;
+    }
+
+    weak_entry_t(objc_object *newReferent, objc_object **newReferrer)
+        : referent(newReferent)
+    {
+        inline_referrers[0] = newReferrer;
+        for (int i = 1; i < WEAK_INLINE_COUNT; i++) {
+            inline_referrers[i] = nil;
+        }
+    }
+};
+
+/**
+ * The global weak references table. Stores object ids as keys,
+ * and weak_entry_t structs as their values.
+ */
+struct weak_table_t {
+    weak_entry_t *weak_entries;
+    size_t    num_entries;
+    uintptr_t mask;
+    uintptr_t max_hash_displacement;
+};
+
+/*
+    ...
+*/
+```
+
+**总结：**
+
+&emsp;&emsp;`Struct SideTable`是一个全局的用于记录对象引用计数的结构体，对于内存的管理
+1. `Tagged Pointer`的`isa`情况下，不会使用
+2. `nonpointer isa`情况下，先记录到`extra_rc`，超过时，把一半的引用计数移到`SideTable`
+3. `raw isa`情况下，直接记录到`SideTable`中
+
+&emsp;&emsp;`SideTable`中的数据是根据对象地址处理后分散放到各个`SideTable`表`StripeMap`中的`Array`中的
+1. 对于每一个强引用对象，以伪装的对象指针地址为key，引用计数为value进行记录
+2. 对于每一个弱引用对象，以弱引用对象的伪装指针地址为key，以数组或者哈希表记录每个引用这个弱引用对象的伪装对象指针
 
 # 3. 宏观
 
@@ -1386,8 +1580,8 @@ struct objc_class : objc_object {
 
 ## 3.3 Property
 
-## 3.4 Category
+## 3.4 Category & Extension
 
-## 3.5 Association
+## 3.5 Association object
 
 ## 3.6 Autoreleasepool
