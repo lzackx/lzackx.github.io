@@ -11,3 +11,5 @@ github_username:  lzackx
 
 # Build settings
 markdown: kramdown
+
+classes: wide

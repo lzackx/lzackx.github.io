@@ -796,13 +796,13 @@ retry:
 }
 ```
 
-1. `has_cxx_dtor`，[2]bit，在使用`nonpointer isa`的情况下，区分是否有C++的析构函数，出于改变`isa`指针、初始化与释放等场景的需要
-2. `shiftcls`，[3]~[36]bit，在使用`nonpointer isa`的情况下，使用33bit空间存储指向类的指针
-3. `magic`，[37]～[42]bit，在使用`nonpointer isa`的情况下，存放魔术数，也用于区分数据是否已初始化
-4. `weakly_referenced`，[43]bit，在使用`nonpointer isa`的情况下，是否有被弱引用，决定释放的时候，是否需要到`SideTable`中处理引用问题
-5. `deallocating`，[44]bit，在使用`nonpointer isa`的情况下，是否正在释放的标识位
-6. `has_sidetable_rc`，[45]bit，在使用`nonpointer isa`的情况下，是否有`SideTable`的引用计数
-7. `extra_rc`，[46]~[64]bit，在使用`nonpointer isa`的情况下，少量引用计数量的存放位，计算引用计数时加一，即（extra_rc + 1）。在引用计数超过19位能表达的值时，引用计数会移交`SideTable`记录，其中`RC_ONE`宏，是用来引用计数加一处理的，而`RC_HALF`则是每次引用计数溢出时，移交一半出去的量，剩余的一半依然留在`extra_rc`中。
+3. `has_cxx_dtor`，[2]bit，在使用`nonpointer isa`的情况下，区分是否有C++的析构函数，出于改变`isa`指针、初始化与释放等场景的需要
+4. `shiftcls`，[3]~[36]bit，在使用`nonpointer isa`的情况下，使用33bit空间存储指向类的指针
+5. `magic`，[37]～[42]bit，在使用`nonpointer isa`的情况下，存放魔术数，也用于区分数据是否已初始化
+6. `weakly_referenced`，[43]bit，在使用`nonpointer isa`的情况下，是否有被弱引用，决定释放的时候，是否需要到`SideTable`中处理引用问题
+7. `deallocating`，[44]bit，在使用`nonpointer isa`的情况下，是否正在释放的标识位
+8. `has_sidetable_rc`，[45]bit，在使用`nonpointer isa`的情况下，是否有`SideTable`的引用计数
+9. `extra_rc`，[46]~[64]bit，在使用`nonpointer isa`的情况下，少量引用计数量的存放位，计算引用计数时加一，即（extra_rc + 1）。在引用计数超过19位能表达的值时，引用计数会移交`SideTable`记录，其中`RC_ONE`宏，是用来引用计数加一处理的，而`RC_HALF`则是每次引用计数溢出时，移交一半出去的量，剩余的一半依然留在`extra_rc`中。
 
 &emsp;&emsp;`nonpointer isa`这种内存优化方式只在类指针地址在提供的bit能表达的情况下使用，当指针地址超过了提供的bit能表达的数量时，就会切换为正常的指针。这些都是运行时进行的，这体现了`objc`提供出来的运行时特性，具体的实现函数如下：
 ```ObjC
@@ -1213,13 +1213,15 @@ void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver)
 ```
 
 4. `bits`，`struct class_data_bits_t`类型，ObjC中的类内部内容就存放在这里了，包括变量、属性、方法、遵循的协议
-   1. `struct class_data_bits_t`，如下
-      1. `struct objc_class`是`struct class_data_bits_t`的友元结构体，可以访问内部的私有函数
-      2. 内嵌一个`bits`变量，同样是为了优化内存，通过掩码方式存放数据获
-         1. [0]bit，Swift的ABI稳定前的标识位
-         2. [1]bit，Swift的ABI稳定版本的标识位
-         3. [2]bit, 类中有默认`RR`的标识位
-         4. [3]~[46]bit，取`class_rw_t`类型的数据指针，共44位
+
+&emsp;&emsp;`struct class_data_bits_t`，如下
+
+1. `struct objc_class`是`struct class_data_bits_t`的友元结构体，可以访问内部的私有函数
+2. 内嵌一个`bits`变量，同样是为了优化内存，通过掩码方式存放数据获
+   1. [0]bit，Swift的ABI稳定前的标识位
+   2. [1]bit，Swift的ABI稳定版本的标识位
+   3. [2]bit, 类中有默认`RR`的标识位
+   4. [3]~[46]bit，取`class_rw_t`类型的数据指针，共44位
 
 ```ObjC
     /*
