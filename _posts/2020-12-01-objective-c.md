@@ -35,6 +35,7 @@ categories: Objective-C
     struct a *v2
     A_P v2;
     ```
+3. `using type = other_type;`可理解为类型别名
 
 # 2. 微观
 
@@ -175,72 +176,81 @@ OBJC_EXPORT
    2. `protocol`含有`ObjC`里`id`、`SEL`、`Class`关系的标准方法声明
 2. 3个在声明中的类`NSString`, `NSMethodSignature`, `NSInvocation`，在实现中是没有作用的，因为相关返回类型或参数类型在实现中并没有调用，并且可以看到一些类的方法实现，需要依赖`CoreFoundation`内的代码才有实现的意义
 3. `objc`与`runtime`载体，`id`, `Class`, `SEL`, `IMP`，它们的声明在源码中是有分叉的，很容易让人迷惑。
-   1. 在`NSObject.h`引入的头文件`objc.h`中，有一份相关的声明，如下，作为一份对外声明的头文件来说，显然声明了`id`, `Class`, `SEL`, `IMP`这4个名字是什么数据类型的别名。
-        ```ObjC
-        #include <objc/objc-api.h>
 
-        // ...
+&emsp;&emsp;在`NSObject.h`引入的头文件`objc.h`中，有一份相关的声明，如下，作为一份对外声明的头文件来说，显然声明了`id`, `Class`, `SEL`, `IMP`这4个名字是什么数据类型的别名
 
-        #if !OBJC_TYPES_DEFINED
-        /// An opaque type that represents an Objective-C class.
-        typedef struct objc_class *Class;
+```ObjC
+#include <objc/objc-api.h>
 
-        /// Represents an instance of a class.
-        struct objc_object {
-            Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
-        };
+// ...
 
-        /// A pointer to an instance of a class.
-        typedef struct objc_object *id;
-        #endif
+#if !OBJC_TYPES_DEFINED
+/// An opaque type that represents an Objective-C class.
+typedef struct objc_class *Class;
 
-        /// An opaque type that represents a method selector.
-        typedef struct objc_selector *SEL;
+/// Represents an instance of a class.
+struct objc_object {
+    Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
+};
 
-        /// A pointer to the function of a method implementation. 
-        #if !OBJC_OLD_DISPATCH_PROTOTYPES
-        typedef void (*IMP)(void /* id, SEL, ... */ ); 
-        #else
-        typedef id _Nullable (*IMP)(id _Nonnull, SEL _Nonnull, ...); 
-        #endif
-        ```
-   2. 在`NSObject.mm`引入的头文件`objc-private.h`中，却有特别的引入头文件方式，如下，先引入`objc-private.h`，再引入`NSObject.h`。
-      1. `NSObject.mm`源码：
-        ```ObjC
-        #include "objc-private.h"
-        #include "NSObject.h"
-        ```
-      2. `objc-private.h`源码：
-        ```ObjC
-        // ...
-        #ifdef _OBJC_OBJC_H_
-        #error include objc-private.h before other headers
-        #endif
+/// A pointer to an instance of a class.
+typedef struct objc_object *id;
+#endif
 
-        #define OBJC_TYPES_DEFINED 1
+/// An opaque type that represents a method selector.
+typedef struct objc_selector *SEL;
 
-        // ...
+/// A pointer to the function of a method implementation. 
+#if !OBJC_OLD_DISPATCH_PROTOTYPES
+typedef void (*IMP)(void /* id, SEL, ... */ ); 
+#else
+typedef id _Nullable (*IMP)(id _Nonnull, SEL _Nonnull, ...); 
+#endif
+```
 
-        struct objc_class;
-        struct objc_object;
+&emsp;&emsp;在`NSObject.mm`引入的头文件`objc-private.h`中，却有特别的引入头文件方式，如下，先引入`objc-private.h`，再引入`NSObject.h`。
+1. `NSObject.mm`源码：
 
-        typedef struct objc_class *Class;
-        typedef struct objc_object *id;
-        ```
-      3. 如此一来，`objc-private.h`中定义的宏`OBJC_TYPES_DEFINED`，使得`NSObject.mm`中关于`id`, `Class`的别名声明不是使用`objc.h`中的，而是`objc-private.h`内的再次声明的别名了。
-      4. 从前面几个注意点可以看出，实际的这几个`objc`与`runtime`载体，有效的声明如下：
-        ```ObjC
-        // 结构体声明别名
-        typedef struct objc_class *Class;
-        typedef struct objc_object *id;
-        // objc.h中的声明是有效的
-        typedef struct objc_selector *SEL;
-        // 声明 IMP 为类型别名的函数指针
-        // 第一个参数是 id 类型，即 struct objc_object *
-        // 第二个参数是 SEL 类型， 即 struct objc_selector *
-        // 后续参数可变
-        typedef id (*IMP)(id, SEL, ...); 
-        ```
+```ObjC
+#include "objc-private.h"
+#include "NSObject.h"
+```
+
+2. `objc-private.h`源码：
+
+```ObjC
+// ...
+#ifdef _OBJC_OBJC_H_
+#error include objc-private.h before other headers
+#endif
+
+#define OBJC_TYPES_DEFINED 1
+
+// ...
+
+struct objc_class;
+struct objc_object;
+
+typedef struct objc_class *Class;
+typedef struct objc_object *id;
+```
+
+3. 如此一来，`objc-private.h`中定义的宏`OBJC_TYPES_DEFINED`，使得`NSObject.mm`中关于`id`, `Class`的别名声明不是使用`objc.h`中的，而是`objc-private.h`内的再次声明的别名了。
+4. 从前面几个注意点可以看出，实际的这几个`objc`与`runtime`载体，有效的声明如下：
+
+```ObjC
+// 结构体声明别名
+typedef struct objc_class *Class;
+typedef struct objc_object *id;
+// objc.h中的声明是有效的
+typedef struct objc_selector *SEL;
+// 声明 IMP 为类型别名的函数指针
+// 第一个参数是 id 类型，即 struct objc_object *
+// 第二个参数是 SEL 类型， 即 struct objc_selector *
+// 后续参数可变
+typedef id (*IMP)(id, SEL, ...); 
+```
+
 ## 2.2 `objc_object`
 
 &emsp;&emsp;通过上面看到的`NSObject`实现，可以发现，他们都在操作一种数据，就是`objc_objcet`。
@@ -716,79 +726,83 @@ _objc_getTaggedPointerSignedValue(const void * _Nullable ptr)
 &emsp;&emsp;从`ISA_BITFIELD`中，逐个查看他们的作用。
 
 1. `nonpointer`，[0]bit，区分`isa`是否使用`nonpointer isa`，`isa`是个`union`，在使用`nonpointer`的情况下，先以0值初始化，然后根据`nonpointer isa`内结构体的位进行默认赋值。没有使用的情况下，`isa`的初始化就是正常的一个指针。在`struct objc_object`的私有初始化函数中可以看到其实现：
-   ```ObjC
-    inline void 
-    objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor) 
-    { 
-        ASSERT(!isTaggedPointer()); 
-        
-        if (!nonpointer) {
-            isa = isa_t((uintptr_t)cls);
-        } else {
-            ASSERT(!DisableNonpointerIsa);
-            ASSERT(!cls->instancesRequireRawIsa());
 
-            isa_t newisa(0);
+```ObjC
+inline void 
+objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor) 
+{ 
+    ASSERT(!isTaggedPointer()); 
+    
+    if (!nonpointer) {
+        isa = isa_t((uintptr_t)cls);
+    } else {
+        ASSERT(!DisableNonpointerIsa);
+        ASSERT(!cls->instancesRequireRawIsa());
 
-    #if SUPPORT_INDEXED_ISA
-            ASSERT(cls->classArrayIndex() > 0);
-            newisa.bits = ISA_INDEX_MAGIC_VALUE;
-            // isa.magic is part of ISA_MAGIC_VALUE
-            // isa.nonpointer is part of ISA_MAGIC_VALUE
-            newisa.has_cxx_dtor = hasCxxDtor;
-            newisa.indexcls = (uintptr_t)cls->classArrayIndex();
-    #else
-            newisa.bits = ISA_MAGIC_VALUE;
-            // isa.magic is part of ISA_MAGIC_VALUE
-            // isa.nonpointer is part of ISA_MAGIC_VALUE
-            newisa.has_cxx_dtor = hasCxxDtor;
-            newisa.shiftcls = (uintptr_t)cls >> 3;
-    #endif
+        isa_t newisa(0);
 
-            // This write must be performed in a single store in some cases
-            // (for example when realizing a class because other threads
-            // may simultaneously try to use the class).
-            // fixme use atomics here to guarantee single-store and to
-            // guarantee memory order w.r.t. the class index table
-            // ...but not too atomic because we don't want to hurt instantiation
-            isa = newisa;
-        }
+#if SUPPORT_INDEXED_ISA
+        ASSERT(cls->classArrayIndex() > 0);
+        newisa.bits = ISA_INDEX_MAGIC_VALUE;
+        // isa.magic is part of ISA_MAGIC_VALUE
+        // isa.nonpointer is part of ISA_MAGIC_VALUE
+        newisa.has_cxx_dtor = hasCxxDtor;
+        newisa.indexcls = (uintptr_t)cls->classArrayIndex();
+#else
+        newisa.bits = ISA_MAGIC_VALUE;
+        // isa.magic is part of ISA_MAGIC_VALUE
+        // isa.nonpointer is part of ISA_MAGIC_VALUE
+        newisa.has_cxx_dtor = hasCxxDtor;
+        newisa.shiftcls = (uintptr_t)cls >> 3;
+#endif
+
+        // This write must be performed in a single store in some cases
+        // (for example when realizing a class because other threads
+        // may simultaneously try to use the class).
+        // fixme use atomics here to guarantee single-store and to
+        // guarantee memory order w.r.t. the class index table
+        // ...but not too atomic because we don't want to hurt instantiation
+        isa = newisa;
     }
-   ```
+}
+```
+
 2. `has_assoc`，[1]bit，在使用`nonpointer isa`的情况下，区分是否有联合对象（Association Object），相关函数如下：
-   ```ObjC
-   inline bool
-    objc_object::hasAssociatedObjects()
-    {
-        if (isTaggedPointer()) return true;
-        if (isa.nonpointer) return isa.has_assoc;
-        return true;
+
+```ObjC
+inline bool
+objc_object::hasAssociatedObjects()
+{
+    if (isTaggedPointer()) return true;
+    if (isa.nonpointer) return isa.has_assoc;
+    return true;
+}
+
+
+inline void
+objc_object::setHasAssociatedObjects()
+{
+    if (isTaggedPointer()) return;
+
+retry:
+    isa_t oldisa = LoadExclusive(&isa.bits);
+    isa_t newisa = oldisa;
+    if (!newisa.nonpointer  ||  newisa.has_assoc) {
+        ClearExclusive(&isa.bits);
+        return;
     }
+    newisa.has_assoc = true;
+    if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
+}
+```
 
-
-    inline void
-    objc_object::setHasAssociatedObjects()
-    {
-        if (isTaggedPointer()) return;
-
-    retry:
-        isa_t oldisa = LoadExclusive(&isa.bits);
-        isa_t newisa = oldisa;
-        if (!newisa.nonpointer  ||  newisa.has_assoc) {
-            ClearExclusive(&isa.bits);
-            return;
-        }
-        newisa.has_assoc = true;
-        if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
-    }
-   ```
-3. `has_cxx_dtor`，[2]bit，在使用`nonpointer isa`的情况下，区分是否有C++的析构函数，出于改变`isa`指针、初始化与释放等场景的需要
-4. `shiftcls`，[3]~[36]bit，在使用`nonpointer isa`的情况下，使用33bit空间存储指向类的指针
-5. `magic`，[37]～[42]bit，在使用`nonpointer isa`的情况下，存放魔术数，也用于区分数据是否已初始化
-6. `weakly_referenced`，[43]bit，在使用`nonpointer isa`的情况下，是否有被弱引用，决定释放的时候，是否需要到`SideTable`中处理引用问题
-7. `deallocating`，[44]bit，在使用`nonpointer isa`的情况下，是否正在释放的标识位
-8. `has_sidetable_rc`，[45]bit，在使用`nonpointer isa`的情况下，是否有`SideTable`的引用计数
-9. `extra_rc`，[46]~[64]bit，在使用`nonpointer isa`的情况下，少量引用计数量的存放位，计算引用计数时加一，即（extra_rc + 1）。在引用计数超过19位能表达的值时，引用计数会移交`SideTable`记录，其中`RC_ONE`宏，是用来引用计数加一处理的，而`RC_HALF`则是每次引用计数溢出时，移交一半出去的量，剩余的一半依然留在`extra_rc`中。
+1. `has_cxx_dtor`，[2]bit，在使用`nonpointer isa`的情况下，区分是否有C++的析构函数，出于改变`isa`指针、初始化与释放等场景的需要
+2. `shiftcls`，[3]~[36]bit，在使用`nonpointer isa`的情况下，使用33bit空间存储指向类的指针
+3. `magic`，[37]～[42]bit，在使用`nonpointer isa`的情况下，存放魔术数，也用于区分数据是否已初始化
+4. `weakly_referenced`，[43]bit，在使用`nonpointer isa`的情况下，是否有被弱引用，决定释放的时候，是否需要到`SideTable`中处理引用问题
+5. `deallocating`，[44]bit，在使用`nonpointer isa`的情况下，是否正在释放的标识位
+6. `has_sidetable_rc`，[45]bit，在使用`nonpointer isa`的情况下，是否有`SideTable`的引用计数
+7. `extra_rc`，[46]~[64]bit，在使用`nonpointer isa`的情况下，少量引用计数量的存放位，计算引用计数时加一，即（extra_rc + 1）。在引用计数超过19位能表达的值时，引用计数会移交`SideTable`记录，其中`RC_ONE`宏，是用来引用计数加一处理的，而`RC_HALF`则是每次引用计数溢出时，移交一半出去的量，剩余的一半依然留在`extra_rc`中。
 
 &emsp;&emsp;`nonpointer isa`这种内存优化方式只在类指针地址在提供的bit能表达的情况下使用，当指针地址超过了提供的bit能表达的数量时，就会切换为正常的指针。这些都是运行时进行的，这体现了`objc`提供出来的运行时特性，具体的实现函数如下：
 ```ObjC
@@ -872,6 +886,7 @@ objc_object::changeIsa(Class newCls)
     }
 }
 ```
+
 **总结：**`nonpointer isa`的内存优化，本质上，是缩减类指针地址在较低数值的时候在内存读写时的消耗，并不是一个正常的指向内存地址的指针，而是把类指针地址存到到`isa`的部分位内，并且将运行时需要的标识存放于其他位置。仅在类指针地址超过范围后，才转变为真正的指向内存地址的指针，从代码注释中看到`MACH_VM_MAX_ADDRESS 0x1000000000`，占用的是36bit地址位，33位的`nonpointer isa`类地址能处理绝大多数的场景了。这种处理极大地提高了嵌入式设备不需要大量运算的使用场景的运行效率。
 
 ## 2.4 `objc_class`
@@ -915,220 +930,224 @@ struct objc_class : objc_object {
          1. 在建立联系的过程中，`Class`调用`initClassIsa`函数初始化`isa`指针，参数是`Class(meta)`，所以可以很清晰地知道`Class`的`isa`指向`Class(meta)`
          2. 如果`Class`没有父`Class`，会分开判断，将`Class(meta)`内的`supercls`变量赋值为`Class`，而`Class`的`supercls`赋值为`Nil`，`Class(meta)`的`isa`是自己
          3. 如果`Class`有父`Class`，那么`supercls`就是父`Class`，而`Class(meta)`则是`supercls`的`isa`，`Class(meta)`的`isa`是父`Class`的`Class(meta)`的`Class(meta)`，即`Root Class(meta)`
-    ```ObjC
-    static Class 
-    alloc_class_for_subclass(Class supercls, size_t extraBytes)
-    {
-        if (!supercls  ||  !supercls->isAnySwift()) {
-            return _calloc_class(sizeof(objc_class) + extraBytes);
-        }
 
-        /*
-            objc4中对Swift兼容的处理此处忽略
-        */
+```ObjC
+static Class 
+alloc_class_for_subclass(Class supercls, size_t extraBytes)
+{
+    if (!supercls  ||  !supercls->isAnySwift()) {
+        return _calloc_class(sizeof(objc_class) + extraBytes);
     }
 
-    // &UnsetLayout is the default ivar layout during class construction
-    static const uint8_t UnsetLayout = 0;
+    /*
+        objc4中对Swift兼容的处理此处忽略
+    */
+}
 
-    static void objc_initializeClassPair_internal(Class superclass, const char *name, Class cls, Class meta)
-    {
-        runtimeLock.assertLocked();
+// &UnsetLayout is the default ivar layout during class construction
+static const uint8_t UnsetLayout = 0;
 
-        class_ro_t *cls_ro_w, *meta_ro_w;
-        class_rw_t *cls_rw_w, *meta_rw_w;
-        
-        cls_rw_w   = objc::zalloc<class_rw_t>();
-        meta_rw_w  = objc::zalloc<class_rw_t>();
-        cls_ro_w   = (class_ro_t *)calloc(sizeof(class_ro_t), 1);
-        meta_ro_w  = (class_ro_t *)calloc(sizeof(class_ro_t), 1);
+static void objc_initializeClassPair_internal(Class superclass, const char *name, Class cls, Class meta)
+{
+    runtimeLock.assertLocked();
 
-        cls->setData(cls_rw_w);
-        cls_rw_w->set_ro(cls_ro_w);
-        meta->setData(meta_rw_w);
-        meta_rw_w->set_ro(meta_ro_w);
+    class_ro_t *cls_ro_w, *meta_ro_w;
+    class_rw_t *cls_rw_w, *meta_rw_w;
+    
+    cls_rw_w   = objc::zalloc<class_rw_t>();
+    meta_rw_w  = objc::zalloc<class_rw_t>();
+    cls_ro_w   = (class_ro_t *)calloc(sizeof(class_ro_t), 1);
+    meta_ro_w  = (class_ro_t *)calloc(sizeof(class_ro_t), 1);
 
-        // Set basic info
+    cls->setData(cls_rw_w);
+    cls_rw_w->set_ro(cls_ro_w);
+    meta->setData(meta_rw_w);
+    meta_rw_w->set_ro(meta_ro_w);
 
-        cls_rw_w->flags = RW_CONSTRUCTING | RW_COPIED_RO | RW_REALIZED | RW_REALIZING;
-        meta_rw_w->flags = RW_CONSTRUCTING | RW_COPIED_RO | RW_REALIZED | RW_REALIZING | RW_META;
+    // Set basic info
 
-        cls_ro_w->flags = 0;
-        meta_ro_w->flags = RO_META;
-        if (superclass) {
-            uint32_t flagsToCopy = RW_FORBIDS_ASSOCIATED_OBJECTS;
-            cls_rw_w->flags |= superclass->data()->flags & flagsToCopy;
-            cls_ro_w->instanceStart = superclass->unalignedInstanceSize();
-            meta_ro_w->instanceStart = superclass->ISA()->unalignedInstanceSize();
-            cls->setInstanceSize(cls_ro_w->instanceStart);
-            meta->setInstanceSize(meta_ro_w->instanceStart);
-        } else {
-            cls_ro_w->flags |= RO_ROOT;
-            meta_ro_w->flags |= RO_ROOT;
-            cls_ro_w->instanceStart = 0;
-            meta_ro_w->instanceStart = (uint32_t)sizeof(objc_class);
-            cls->setInstanceSize((uint32_t)sizeof(id));  // just an isa
-            meta->setInstanceSize(meta_ro_w->instanceStart);
-        }
+    cls_rw_w->flags = RW_CONSTRUCTING | RW_COPIED_RO | RW_REALIZED | RW_REALIZING;
+    meta_rw_w->flags = RW_CONSTRUCTING | RW_COPIED_RO | RW_REALIZED | RW_REALIZING | RW_META;
 
-        cls_ro_w->name = strdupIfMutable(name);
-        meta_ro_w->name = strdupIfMutable(name);
-
-        cls_ro_w->ivarLayout = &UnsetLayout;
-        cls_ro_w->weakIvarLayout = &UnsetLayout;
-
-        meta->chooseClassArrayIndex();
-        cls->chooseClassArrayIndex();
-
-        // This absolutely needs to be done before addSubclass
-        // as initializeToEmpty() clobbers the FAST_CACHE bits
-        cls->cache.initializeToEmpty();
-        meta->cache.initializeToEmpty();
-
-    #if FAST_CACHE_META
-        meta->cache.setBit(FAST_CACHE_META);
-    #endif
-        meta->setInstancesRequireRawIsa();
-
-        // Connect to superclasses and metaclasses
-        cls->initClassIsa(meta);
-
-        if (superclass) {
-            meta->initClassIsa(superclass->ISA()->ISA());
-            cls->superclass = superclass;
-            meta->superclass = superclass->ISA();
-            addSubclass(superclass, cls);
-            addSubclass(superclass->ISA(), meta);
-        } else {
-            meta->initClassIsa(meta);
-            cls->superclass = Nil;
-            meta->superclass = cls;
-            addRootClass(cls);
-            addSubclass(cls, meta);
-        }
-
-        addClassTableEntry(cls);
+    cls_ro_w->flags = 0;
+    meta_ro_w->flags = RO_META;
+    if (superclass) {
+        uint32_t flagsToCopy = RW_FORBIDS_ASSOCIATED_OBJECTS;
+        cls_rw_w->flags |= superclass->data()->flags & flagsToCopy;
+        cls_ro_w->instanceStart = superclass->unalignedInstanceSize();
+        meta_ro_w->instanceStart = superclass->ISA()->unalignedInstanceSize();
+        cls->setInstanceSize(cls_ro_w->instanceStart);
+        meta->setInstanceSize(meta_ro_w->instanceStart);
+    } else {
+        cls_ro_w->flags |= RO_ROOT;
+        meta_ro_w->flags |= RO_ROOT;
+        cls_ro_w->instanceStart = 0;
+        meta_ro_w->instanceStart = (uint32_t)sizeof(objc_class);
+        cls->setInstanceSize((uint32_t)sizeof(id));  // just an isa
+        meta->setInstanceSize(meta_ro_w->instanceStart);
     }
-    /***********************************************************************
-   * addClassTableEntry
-   * Add a class to the table of all classes. If addMeta is true,
-   * automatically adds the metaclass of the class as well.
-   * Locking: runtimeLock must be held by the caller.
-   **********************************************************************/
-   static void
-   addClassTableEntry(Class cls, bool addMeta = true)
-   {
-       runtimeLock.assertLocked();
 
-       // This class is allowed to be a known class via the shared cache or via
-       // data segments, but it is not allowed to be in the dynamic table already.
-       auto &set = objc::allocatedClasses.get();
+    cls_ro_w->name = strdupIfMutable(name);
+    meta_ro_w->name = strdupIfMutable(name);
 
-       ASSERT(set.find(cls) == set.end());
+    cls_ro_w->ivarLayout = &UnsetLayout;
+    cls_ro_w->weakIvarLayout = &UnsetLayout;
 
-       if (!isKnownClass(cls))
-           set.insert(cls);
-       if (addMeta)
-           addClassTableEntry(cls->ISA(), false);
-   }
+    meta->chooseClassArrayIndex();
+    cls->chooseClassArrayIndex();
 
-    Class objc_allocateClassPair(Class superclass, const char *name, 
-                            size_t extraBytes)
-    {
-        Class cls, meta;
+    // This absolutely needs to be done before addSubclass
+    // as initializeToEmpty() clobbers the FAST_CACHE bits
+    cls->cache.initializeToEmpty();
+    meta->cache.initializeToEmpty();
 
-        // Fail if the class name is in use.
-        if (look_up_class(name, NO, NO)) return nil;
+#if FAST_CACHE_META
+    meta->cache.setBit(FAST_CACHE_META);
+#endif
+    meta->setInstancesRequireRawIsa();
 
-        mutex_locker_t lock(runtimeLock);
+    // Connect to superclasses and metaclasses
+    cls->initClassIsa(meta);
 
-        // Fail if the class name is in use.
-        // Fail if the superclass isn't kosher.
-        if (getClassExceptSomeSwift(name)  ||
-            !verifySuperclass(superclass, true/*rootOK*/))
-        {
-            return nil;
-        }
-
-        // Allocate new classes.
-        cls  = alloc_class_for_subclass(superclass, extraBytes);
-        meta = alloc_class_for_subclass(superclass, extraBytes);
-
-        // fixme mangle the name if it looks swift-y?
-        objc_initializeClassPair_internal(superclass, name, cls, meta);
-
-        return cls;
+    if (superclass) {
+        meta->initClassIsa(superclass->ISA()->ISA());
+        cls->superclass = superclass;
+        meta->superclass = superclass->ISA();
+        addSubclass(superclass, cls);
+        addSubclass(superclass->ISA(), meta);
+    } else {
+        meta->initClassIsa(meta);
+        cls->superclass = Nil;
+        meta->superclass = cls;
+        addRootClass(cls);
+        addSubclass(cls, meta);
     }
-    ```
+
+    addClassTableEntry(cls);
+}
+/***********************************************************************
+* addClassTableEntry
+* Add a class to the table of all classes. If addMeta is true,
+* automatically adds the metaclass of the class as well.
+* Locking: runtimeLock must be held by the caller.
+**********************************************************************/
+static void
+addClassTableEntry(Class cls, bool addMeta = true)
+{
+    runtimeLock.assertLocked();
+
+    // This class is allowed to be a known class via the shared cache or via
+    // data segments, but it is not allowed to be in the dynamic table already.
+    auto &set = objc::allocatedClasses.get();
+
+    ASSERT(set.find(cls) == set.end());
+
+    if (!isKnownClass(cls))
+        set.insert(cls);
+    if (addMeta)
+        addClassTableEntry(cls->ISA(), false);
+}
+
+Class objc_allocateClassPair(Class superclass, const char *name, 
+                        size_t extraBytes)
+{
+    Class cls, meta;
+
+    // Fail if the class name is in use.
+    if (look_up_class(name, NO, NO)) return nil;
+
+    mutex_locker_t lock(runtimeLock);
+
+    // Fail if the class name is in use.
+    // Fail if the superclass isn't kosher.
+    if (getClassExceptSomeSwift(name)  ||
+        !verifySuperclass(superclass, true/*rootOK*/))
+    {
+        return nil;
+    }
+
+    // Allocate new classes.
+    cls  = alloc_class_for_subclass(superclass, extraBytes);
+    meta = alloc_class_for_subclass(superclass, extraBytes);
+
+    // fixme mangle the name if it looks swift-y?
+    objc_initializeClassPair_internal(superclass, name, cls, meta);
+
+    return cls;
+}
+```
+
 3. `cache`，常用方法缓存，用于优化常用方法的寻找速度，通过`struct cache_t`内函数对`struct bucket_t`进行管理
    1. `CACHE_MASK_STORAGE`宏（定义位于`objc-config.h`中）在64位iPhoneOS中，值为 `CACHE_MASK_STORAGE_HIGH_16`，即高16位掩码
    2. `struct cache_t`，如下，与`nonpointer isa`的优化相似，`_maskAndBuckets`内保存着`bucket_t`的地址、4位用于`msgSend`的0位和16位的高位掩码，其中，16位掩码用于获取`bucket`的容量，同时也是`bucket`数量的最大值，即缓存方法数量的最大值
-    ```ObjC
-    struct cache_t {
-    #if CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_OUTLINED
-        /*
-            ...
-        */
-    #elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_HIGH_16
-        explicit_atomic<uintptr_t> _maskAndBuckets;
-        mask_t _mask_unused;
-        
-        // How much the mask is shifted by.
-        static constexpr uintptr_t maskShift = 48;
-        
-        // Additional bits after the mask which must be zero. msgSend
-        // takes advantage of these additional bits to construct the value
-        // `mask << 4` from `_maskAndBuckets` in a single instruction.
-        static constexpr uintptr_t maskZeroBits = 4;
-        
-        // The largest mask value we can store.
-        static constexpr uintptr_t maxMask = ((uintptr_t)1 << (64 - maskShift)) - 1;
-        
-        // The mask applied to `_maskAndBuckets` to retrieve the buckets pointer.
-        static constexpr uintptr_t bucketsMask = ((uintptr_t)1 << (maskShift - maskZeroBits)) - 1;
-        
-        // Ensure we have enough bits for the buckets pointer.
-        static_assert(bucketsMask >= MACH_VM_MAX_ADDRESS, "Bucket field doesn't have enough bits for arbitrary pointers.");
-    #elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_LOW_4
-        /*
-            ...
-        */
-    #else
-    #error Unknown cache mask storage type.
-    #endif
-        
-    #if __LP64__
-        uint16_t _flags;
-    #endif
-        uint16_t _occupied;
 
-    public:
-        static bucket_t *emptyBuckets();
-        
-        struct bucket_t *buckets();
-        mask_t mask();
-        mask_t occupied();
-        void incrementOccupied();
-        void setBucketsAndMask(struct bucket_t *newBuckets, mask_t newMask);
-        void initializeToEmpty();
-
-        unsigned capacity();
-        bool isConstantEmptyCache();
-        bool canBeFreed();
-
+```ObjC
+struct cache_t {
+#if CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_OUTLINED
     /*
-        忽略一些对 _flag 的处理
+        ...
     */
+#elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_HIGH_16
+    explicit_atomic<uintptr_t> _maskAndBuckets;
+    mask_t _mask_unused;
+    
+    // How much the mask is shifted by.
+    static constexpr uintptr_t maskShift = 48;
+    
+    // Additional bits after the mask which must be zero. msgSend
+    // takes advantage of these additional bits to construct the value
+    // `mask << 4` from `_maskAndBuckets` in a single instruction.
+    static constexpr uintptr_t maskZeroBits = 4;
+    
+    // The largest mask value we can store.
+    static constexpr uintptr_t maxMask = ((uintptr_t)1 << (64 - maskShift)) - 1;
+    
+    // The mask applied to `_maskAndBuckets` to retrieve the buckets pointer.
+    static constexpr uintptr_t bucketsMask = ((uintptr_t)1 << (maskShift - maskZeroBits)) - 1;
+    
+    // Ensure we have enough bits for the buckets pointer.
+    static_assert(bucketsMask >= MACH_VM_MAX_ADDRESS, "Bucket field doesn't have enough bits for arbitrary pointers.");
+#elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_LOW_4
+    /*
+        ...
+    */
+#else
+#error Unknown cache mask storage type.
+#endif
+    
+#if __LP64__
+    uint16_t _flags;
+#endif
+    uint16_t _occupied;
 
-        static size_t bytesForCapacity(uint32_t cap);
-        static struct bucket_t * endMarker(struct bucket_t *b, uint32_t cap);
+public:
+    static bucket_t *emptyBuckets();
+    
+    struct bucket_t *buckets();
+    mask_t mask();
+    mask_t occupied();
+    void incrementOccupied();
+    void setBucketsAndMask(struct bucket_t *newBuckets, mask_t newMask);
+    void initializeToEmpty();
 
-        void reallocate(mask_t oldCapacity, mask_t newCapacity, bool freeOld);
-        void insert(Class cls, SEL sel, IMP imp, id receiver);
+    unsigned capacity();
+    bool isConstantEmptyCache();
+    bool canBeFreed();
 
-        static void bad_cache(id receiver, SEL sel, Class isa) __attribute__((noreturn, cold));
-    };
-    ```
+/*
+    忽略一些对 _flag 的处理
+*/
+
+    static size_t bytesForCapacity(uint32_t cap);
+    static struct bucket_t * endMarker(struct bucket_t *b, uint32_t cap);
+
+    void reallocate(mask_t oldCapacity, mask_t newCapacity, bool freeOld);
+    void insert(Class cls, SEL sel, IMP imp, id receiver);
+
+    static void bad_cache(id receiver, SEL sel, Class isa) __attribute__((noreturn, cold));
+};
+```
+
    3. 缓存方法时，会调用`insert`函数，如下，
       1. 处理缓存的数量
       2. 根据已缓存容量调整插入后的容量大小，注意到`reallocate`函数，调整缓存空间大小的时候，旧的缓存不会跟随到新的缓存内的，而是会被收集释放(根据参数判断调用`cache_collect_free`函数)，所以每次调整缓存容量（空缓存情况除外）后，都是从0开始重新缓存方法
@@ -1136,61 +1155,63 @@ struct objc_class : objc_object {
          2. 已有缓存不超过容量的 3/4 时，不需要处理缓存容量空间
          3. 已有缓存超过容量的 3/4 时，容量扩充2倍，但不超过最大可缓存容量`MAX_CACHE_SIZE`，即（1 << 16）上面提及到的16位掩码能表达的最大值
       3. 通过循环寻找容量范围内的空位插入，如果循环结束还找不到空位插入，调用`bad_cache`，记录崩溃前的日志
-   ```ObjC
-    ALWAYS_INLINE
-    void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver)
-    {
-    #if CONFIG_USE_CACHE_LOCK
-        cacheUpdateLock.assertLocked();
-    #else
-        runtimeLock.assertLocked();
-    #endif
+   
+```ObjC
+ALWAYS_INLINE
+void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver)
+{
+#if CONFIG_USE_CACHE_LOCK
+    cacheUpdateLock.assertLocked();
+#else
+    runtimeLock.assertLocked();
+#endif
 
-        ASSERT(sel != 0 && cls->isInitialized());
+    ASSERT(sel != 0 && cls->isInitialized());
 
-        // Use the cache as-is if it is less than 3/4 full
-        mask_t newOccupied = occupied() + 1;
-        unsigned oldCapacity = capacity(), capacity = oldCapacity;
-        if (slowpath(isConstantEmptyCache())) {
-            // Cache is read-only. Replace it.
-            if (!capacity) capacity = INIT_CACHE_SIZE;
-            reallocate(oldCapacity, capacity, /* freeOld */false);
-        }
-        else if (fastpath(newOccupied + CACHE_END_MARKER <= capacity / 4 * 3)) {
-            // Cache is less than 3/4 full. Use it as-is.
-        }
-        else {
-            capacity = capacity ? capacity * 2 : INIT_CACHE_SIZE;
-            if (capacity > MAX_CACHE_SIZE) {
-                capacity = MAX_CACHE_SIZE;
-            }
-            reallocate(oldCapacity, capacity, true);
-        }
-
-        bucket_t *b = buckets();
-        mask_t m = capacity - 1;
-        mask_t begin = cache_hash(sel, m);
-        mask_t i = begin;
-
-        // Scan for the first unused slot and insert there.
-        // There is guaranteed to be an empty slot because the
-        // minimum size is 4 and we resized at 3/4 full.
-        do {
-            if (fastpath(b[i].sel() == 0)) {
-                incrementOccupied();
-                b[i].set<Atomic, Encoded>(sel, imp, cls);
-                return;
-            }
-            if (b[i].sel() == sel) {
-                // The entry was added to the cache by some other thread
-                // before we grabbed the cacheUpdateLock.
-                return;
-            }
-        } while (fastpath((i = cache_next(i, m)) != begin));
-
-        cache_t::bad_cache(receiver, (SEL)sel, cls);
+    // Use the cache as-is if it is less than 3/4 full
+    mask_t newOccupied = occupied() + 1;
+    unsigned oldCapacity = capacity(), capacity = oldCapacity;
+    if (slowpath(isConstantEmptyCache())) {
+        // Cache is read-only. Replace it.
+        if (!capacity) capacity = INIT_CACHE_SIZE;
+        reallocate(oldCapacity, capacity, /* freeOld */false);
     }
-   ```
+    else if (fastpath(newOccupied + CACHE_END_MARKER <= capacity / 4 * 3)) {
+        // Cache is less than 3/4 full. Use it as-is.
+    }
+    else {
+        capacity = capacity ? capacity * 2 : INIT_CACHE_SIZE;
+        if (capacity > MAX_CACHE_SIZE) {
+            capacity = MAX_CACHE_SIZE;
+        }
+        reallocate(oldCapacity, capacity, true);
+    }
+
+    bucket_t *b = buckets();
+    mask_t m = capacity - 1;
+    mask_t begin = cache_hash(sel, m);
+    mask_t i = begin;
+
+    // Scan for the first unused slot and insert there.
+    // There is guaranteed to be an empty slot because the
+    // minimum size is 4 and we resized at 3/4 full.
+    do {
+        if (fastpath(b[i].sel() == 0)) {
+            incrementOccupied();
+            b[i].set<Atomic, Encoded>(sel, imp, cls);
+            return;
+        }
+        if (b[i].sel() == sel) {
+            // The entry was added to the cache by some other thread
+            // before we grabbed the cacheUpdateLock.
+            return;
+        }
+    } while (fastpath((i = cache_next(i, m)) != begin));
+
+    cache_t::bad_cache(receiver, (SEL)sel, cls);
+}
+```
+
 4. `bits`，`struct class_data_bits_t`类型，ObjC中的类内部内容就存放在这里了，包括变量、属性、方法、遵循的协议
    1. `struct class_data_bits_t`，如下
       1. `struct objc_class`是`struct class_data_bits_t`的友元结构体，可以访问内部的私有函数
@@ -1199,118 +1220,124 @@ struct objc_class : objc_object {
          2. [1]bit，Swift的ABI稳定版本的标识位
          3. [2]bit, 类中有默认`RR`的标识位
          4. [3]~[46]bit，取`class_rw_t`类型的数据指针，共44位
-    ```ObjC
+
+```ObjC
+    /*
+        ...
+    */
+    
+    // class is a Swift class from the pre-stable Swift ABI
+    #define FAST_IS_SWIFT_LEGACY    (1UL<<0)
+    // class is a Swift class from the stable Swift ABI
+    #define FAST_IS_SWIFT_STABLE    (1UL<<1)
+    // class or superclass has default retain/release/autorelease/retainCount/
+    //   _tryRetain/_isDeallocating/retainWeakReference/allowsWeakReference
+    #define FAST_HAS_DEFAULT_RR     (1UL<<2)
+    // data pointer
+    #define FAST_DATA_MASK          0x00007ffffffffff8UL
+
+    /*
+        ...
+    */
+
+    struct class_data_bits_t {
+        friend objc_class;
+
+        // Values are the FAST_ flags above.
+        uintptr_t bits;
         /*
             ...
         */
-        
-        // class is a Swift class from the pre-stable Swift ABI
-        #define FAST_IS_SWIFT_LEGACY    (1UL<<0)
-        // class is a Swift class from the stable Swift ABI
-        #define FAST_IS_SWIFT_STABLE    (1UL<<1)
-        // class or superclass has default retain/release/autorelease/retainCount/
-        //   _tryRetain/_isDeallocating/retainWeakReference/allowsWeakReference
-        #define FAST_HAS_DEFAULT_RR     (1UL<<2)
-        // data pointer
-        #define FAST_DATA_MASK          0x00007ffffffffff8UL
-
-        /*
-            ...
-        */
-
-        struct class_data_bits_t {
-            friend objc_class;
-
-            // Values are the FAST_ flags above.
-            uintptr_t bits;
-            /*
-                ...
-            */
-            public:
-
-            class_rw_t* data() const {
-                return (class_rw_t *)(bits & FAST_DATA_MASK);
-            }
-            void setData(class_rw_t *newData)
-            {
-                ASSERT(!data()  ||  (newData->flags & (RW_REALIZING | RW_FUTURE)));
-                // Set during realization or construction only. No locking needed.
-                // Use a store-release fence because there may be concurrent
-                // readers of data and data's contents.
-                uintptr_t newBits = (bits & ~FAST_DATA_MASK) | (uintptr_t)newData;
-                atomic_thread_fence(memory_order_release);
-                bits = newBits;
-            }
-
-            // Get the class's ro data, even in the presence of concurrent realization.
-            // fixme this isn't really safe without a compiler barrier at least
-            // and probably a memory barrier when realizeClass changes the data field
-            const class_ro_t *safe_ro() {
-                class_rw_t *maybe_rw = data();
-                if (maybe_rw->flags & RW_REALIZED) {
-                    // maybe_rw is rw
-                    return maybe_rw->ro();
-                } else {
-                    // maybe_rw is actually ro
-                    return (class_ro_t *)maybe_rw;
-                }
-            }
-            /*
-                ...
-            */
-        };
-    ```
-   2. `struct class_rw_t`深入，如下：
-      1. `flags`，32bit的变量，用于存放类加载状态的标识，同时也根据加载状态判断以何种数据结构读取数据，其中`RW_REALIZED`即(1<<31)用于判断类是否已经实现
-      2. `witness`，用于快速判断类是否已经加载完毕
-      3. `firstSubclass`， 记录第一个子类，在自上而下的类实现的遍历中用到
-      4. `nextSiblingClass`，记录同父类的兄弟类，同样是在自上而下的类实现的遍历中用到
-      5. 定义泛型`objc::PointerUnion<const class_ro_t *, class_rw_ext_t *>`为`ro_or_rw_ext_t`类型，`objc::PointerUnion`是个指针联合体（可以理解为同一个放地址空间的内存空间内能存放不同类型但是使用同样父类类型的指针的一个数据结构，目的是方便判断和转换类型），通过判断类的实现状态读取`class_ro_t`内的数据。
-         1. 在类实现前，`struct class_data_bits_t`内的`bits`通过掩码获得的指针指向的就是`class_ro_t`，这时，`class_ro_t`同样存在的`flag`的`RW_REALIZED`掩码后值是0
-         2. 在类实现后，`struct class_data_bits_t`内的`bits`通过掩码获得的指针指向的是`class_rw_t`，这时，`class_rw_t`的`flag`的`RW_REALIZED`掩码后值是1，读取`class_ro_t`内的数据需要通过`class_rw_t`内的函数`ro`调用
-         3. 在编译后，`class_ro_t`内的数据就产生了，所以可以在类实现前就通过`class_ro_t`获得一些关于类的变量、方法、或协议，而在类的实现后，使用`class_rw_ext_t`类型，体现了runtime的特性，在运行时，会通过此类型获得类的的变量、方法、或协议
-   ```ObjC
-    struct class_rw_t {
-        // Be warned that Symbolication knows the layout of this structure.
-        uint32_t flags;
-        uint16_t witness;
-        /*
-            ...
-        */
-        explicit_atomic<uintptr_t> ro_or_rw_ext;
-
-        Class firstSubclass;
-        Class nextSiblingClass;
-
-        private:
-        using ro_or_rw_ext_t = objc::PointerUnion<const class_ro_t *, class_rw_ext_t *>;
-
-        const ro_or_rw_ext_t get_ro_or_rwe() const {
-            return ro_or_rw_ext_t{ro_or_rw_ext};
-        }
-
-        void set_ro_or_rwe(const class_ro_t *ro) {
-            ro_or_rw_ext_t{ro}.storeAt(ro_or_rw_ext, memory_order_relaxed);
-        }
-
-        void set_ro_or_rwe(class_rw_ext_t *rwe, const class_ro_t *ro) {
-            // the release barrier is so that the class_rw_ext_t::ro initialization
-            // is visible to lockless readers
-            rwe->ro = ro;
-            ro_or_rw_ext_t{rwe}.storeAt(ro_or_rw_ext, memory_order_release);
-        }
-
-        class_rw_ext_t *extAlloc(const class_ro_t *ro, bool deep = false);
-
         public:
-        
+
+        class_rw_t* data() const {
+            return (class_rw_t *)(bits & FAST_DATA_MASK);
+        }
+        void setData(class_rw_t *newData)
+        {
+            ASSERT(!data()  ||  (newData->flags & (RW_REALIZING | RW_FUTURE)));
+            // Set during realization or construction only. No locking needed.
+            // Use a store-release fence because there may be concurrent
+            // readers of data and data's contents.
+            uintptr_t newBits = (bits & ~FAST_DATA_MASK) | (uintptr_t)newData;
+            atomic_thread_fence(memory_order_release);
+            bits = newBits;
+        }
+
+        // Get the class's ro data, even in the presence of concurrent realization.
+        // fixme this isn't really safe without a compiler barrier at least
+        // and probably a memory barrier when realizeClass changes the data field
+        const class_ro_t *safe_ro() {
+            class_rw_t *maybe_rw = data();
+            if (maybe_rw->flags & RW_REALIZED) {
+                // maybe_rw is rw
+                return maybe_rw->ro();
+            } else {
+                // maybe_rw is actually ro
+                return (class_ro_t *)maybe_rw;
+            }
+        }
         /*
             ...
         */
+    };
+```
+
+&emsp;&emsp;`struct class_rw_t`深入，如下：
+
+1. `flags`，32bit的变量，用于存放类加载状态的标识，同时也根据加载状态判断以何种数据结构读取数据，其中`RW_REALIZED`即(1<<31)用于判断类是否已经实现
+2. `witness`，用于快速判断类是否已经加载完毕
+3. `firstSubclass`， 记录第一个子类，在自上而下的类实现的遍历中用到
+4. `nextSiblingClass`，记录同父类的兄弟类，同样是在自上而下的类实现的遍历中用到
+5. 定义泛型`objc::PointerUnion<const class_ro_t *, class_rw_ext_t *>`为`ro_or_rw_ext_t`类型，`objc::PointerUnion`是个指针联合体（可以理解为同一个放地址空间的内存空间内能存放不同类型但是使用同样父类类型的指针的一个数据结构，目的是方便判断和转换类型），通过判断类的实现状态读取`class_ro_t`内的数据。
+   1. 在类实现前，`struct class_data_bits_t`内的`bits`通过掩码获得的指针指向的就是`class_ro_t`，这时，`class_ro_t`同样存在的`flag`的`RW_REALIZED`掩码后值是0
+   2. 在类实现后，`struct class_data_bits_t`内的`bits`通过掩码获得的指针指向的是`class_rw_t`，这时，`class_rw_t`的`flag`的`RW_REALIZED`掩码后值是1，读取`class_ro_t`内的数据需要通过`class_rw_t`内的函数`ro`调用
+   3. 在编译后，`class_ro_t`内的数据就产生了，所以可以在类实现前就通过`class_ro_t`获得一些关于类的变量、方法、或协议，而在类的实现后，使用`class_rw_ext_t`类型，体现了runtime的特性，在运行时，会通过此类型获得类的的变量、方法、或协议
+
+```ObjC
+struct class_rw_t {
+    // Be warned that Symbolication knows the layout of this structure.
+    uint32_t flags;
+    uint16_t witness;
+    /*
+        ...
+    */
+    explicit_atomic<uintptr_t> ro_or_rw_ext;
+
+    Class firstSubclass;
+    Class nextSiblingClass;
+
+    private:
+    using ro_or_rw_ext_t = objc::PointerUnion<const class_ro_t *, class_rw_ext_t *>;
+
+    const ro_or_rw_ext_t get_ro_or_rwe() const {
+        return ro_or_rw_ext_t{ro_or_rw_ext};
     }
-   ```
-   1. `struct class_ro_t`深入，如下，内部存放了非常多的数据，这个结构体是真正的存放ObjC中使用到的变量、属性、方法、协议等数据的地方
-   ```ObjC
+
+    void set_ro_or_rwe(const class_ro_t *ro) {
+        ro_or_rw_ext_t{ro}.storeAt(ro_or_rw_ext, memory_order_relaxed);
+    }
+
+    void set_ro_or_rwe(class_rw_ext_t *rwe, const class_ro_t *ro) {
+        // the release barrier is so that the class_rw_ext_t::ro initialization
+        // is visible to lockless readers
+        rwe->ro = ro;
+        ro_or_rw_ext_t{rwe}.storeAt(ro_or_rw_ext, memory_order_release);
+    }
+
+    class_rw_ext_t *extAlloc(const class_ro_t *ro, bool deep = false);
+
+    public:
+    
+    /*
+        ...
+    */
+}
+```
+
+&emsp;&emsp;`struct class_ro_t`深入，如下，内部存放了非常多的数据，这个结构体是真正的存放ObjC中使用到的变量、属性、方法、协议等数据的地方
+
+```ObjC
     struct class_ro_t {
         uint32_t flags;
         uint32_t instanceStart;
@@ -1333,39 +1360,41 @@ struct objc_class : objc_object {
             ...
         */
     };
-   ```
-      1. `flags`，32bit的标识位，记录`struct class_ro_t`的class状态，具体标识意思可以通过位于`objc-runtime-new.h`内的宏查到
-      2. `instanceStart`，实例对象的起始内存位置，根类位置为0，与父类对象保持相对位置的存放关系，当父类调整了对象大小后，实例对象的起始位置也要跟着改变
-      3. `instanceSize`，实例对象的大小，子类对象会获得父类对象的大小
-      4. `reserved`，64位处理器的保留位
-      5. `ivarLayout`，记录ObjC类中强引用变量的数量（该变量主要有也有弱引用变量的数量，但是在可以忽略的情况下会忽略掉）主要是强引用的变量，在寻找变量的时候，通过对齐地址的位移，获得各个变量的索引再获取变量
-      6. `name`，类名
-      7. `baseMethodList`，`entsize_list_tt`迭代器泛型模版类，元素类型为`method_t`，提供通过元素地址获取索引的函数
-      8. `baseProtocols`，`protocol_list_t`类型的迭代器，相较于`entsize_list_tt`迭代器少了操作符重载和掩码处理，内部真正的协议数据来自`protocol_ref_t`类型（即实际指向`struct protocol_t`，如下）的数组
-    ```ObjC
-    struct protocol_t : objc_object {
-        const char *mangledName;
-        struct protocol_list_t *protocols;
-        method_list_t *instanceMethods;
-        method_list_t *classMethods;
-        method_list_t *optionalInstanceMethods;
-        method_list_t *optionalClassMethods;
-        property_list_t *instanceProperties;
-        uint32_t size;   // sizeof(protocol_t)
-        uint32_t flags;
-        // Fields below this point are not always present on disk.
-        const char **_extendedMethodTypes;
-        const char *_demangledName;
-        property_list_t *_classProperties;
-        /*
-            ...
-        */
-    };
-    ```
-      1.  `ivars`，`entsize_list_tt`迭代器泛型模版类，元素类型为`ivar_t`，提供判断类中是否存在`ivar`的函数
-      2.  `weakIvarLayout`，记录ObjC类中弱饮用变量的数量，与`ivarLayout`对应，主要是若引用的变量，在寻找变量的时候，通过对齐地址的位移，获得各个变量的索引再获取变量
-      3.  `baseProperties`，`entsize_list_tt`迭代器泛型模版类，元素类型为`property_t`，只有属性名和类型描述
+```
 
+1. `flags`，32bit的标识位，记录`struct class_ro_t`的class状态，具体标识意思可以通过位于`objc-runtime-new.h`内的宏查到
+2. `instanceStart`，实例对象的起始内存位置，根类位置为0，与父类对象保持相对位置的存放关系，当父类调整了对象大小后，实例对象的起始位置也要跟着改变
+3. `instanceSize`，实例对象的大小，子类对象会获得父类对象的大小
+4. `reserved`，64位处理器的保留位
+5. `ivarLayout`，记录ObjC类中强引用变量的数量（该变量主要有也有弱引用变量的数量，但是在可以忽略的情况下会忽略掉）主要是强引用的变量，在寻找变量的时候，通过对齐地址的位移，获得各个变量的索引再获取变量
+6. `name`，类名
+7. `baseMethodList`，`entsize_list_tt`迭代器泛型模版类，元素类型为`method_t`，提供通过元素地址获取索引的函数
+8. `baseProtocols`，`protocol_list_t`类型的迭代器，相较于`entsize_list_tt`迭代器少了操作符重载和掩码处理，内部真正的协议数据来自`protocol_ref_t`类型（即实际指向`struct protocol_t`，如下）的数组
+
+```ObjC
+struct protocol_t : objc_object {
+    const char *mangledName;
+    struct protocol_list_t *protocols;
+    method_list_t *instanceMethods;
+    method_list_t *classMethods;
+    method_list_t *optionalInstanceMethods;
+    method_list_t *optionalClassMethods;
+    property_list_t *instanceProperties;
+    uint32_t size;   // sizeof(protocol_t)
+    uint32_t flags;
+    // Fields below this point are not always present on disk.
+    const char **_extendedMethodTypes;
+    const char *_demangledName;
+    property_list_t *_classProperties;
+    /*
+        ...
+    */
+};
+```
+
+1.  `ivars`，`entsize_list_tt`迭代器泛型模版类，元素类型为`ivar_t`，提供判断类中是否存在`ivar`的函数
+2.  `weakIvarLayout`，记录ObjC类中弱饮用变量的数量，与`ivarLayout`对应，主要是若引用的变量，在寻找变量的时候，通过对齐地址的位移，获得各个变量的索引再获取变量
+3.  `baseProperties`，`entsize_list_tt`迭代器泛型模版类，元素类型为`property_t`，只有属性名和类型描述
 
 **总结：**`struct objc_class`在继承了`struct objc_object`特性的情况下，增加了对象的关系处理，
 1. 通过`isa`与`superclass`联通了实例对象、类、元类，为运行时的消息转发提供了基础
@@ -1375,6 +1404,7 @@ struct objc_class : objc_object {
 ## 2.5 `SideTable`
 
 &emsp;&emsp;`SideTable`用于记录引用计数，通过泛型模版`template<typename T> class StripedMap`包装成`SideTablesMap`，位于`Source/NSObject.mm`，如下，一旦初始化就持续使用不允许释放，通过`SideTables`函数获取C++引用实例使用
+
 ```ObjC
 static objc::ExplicitInit<StripedMap<SideTable>> SideTablesMap;
 
@@ -1387,6 +1417,7 @@ static StripedMap<SideTable>& SideTables() {
    1. `StripedMap`在iPhoneOS内只有8份`SideTable`，`objc_object`的引用计数是根据指针地址的位移操作后分配进`array`内的
    2. `array`内的元素是`struct PaddedT`，对应内部的`value`其实就是`SideTable`类型的变量，并且是64位对齐的
    3. `public`部分有操作符重载，用于通过`objc_object`地址获取对象引用计数，另外还有一些加锁操作，是`SideTable`内的自旋锁的外部调用接口
+
 ```ObjC
 enum { CacheLineSize = 64 };
 
@@ -1476,6 +1507,7 @@ struct SideTable {
       2. 引用它的对象通过联合体读取，
          1. 小于4个时，使用内联数组，充分优化内存
          2. 大于4个时，使用哈希表，在iPhoneOS中，最多可记录`2^62`个弱引用
+
 ```ObjC
 /*
     ...
