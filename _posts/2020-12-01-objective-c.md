@@ -1585,3 +1585,6 @@ struct weak_table_t {
 ## 3.5 Association object
 
 ## 3.6 Autoreleasepool
+
+
+*to be continue*
