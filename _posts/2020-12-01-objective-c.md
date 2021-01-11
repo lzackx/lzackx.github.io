@@ -1614,9 +1614,21 @@ struct weak_table_t {
 
 # 3. 宏观
 
-&emsp;&emsp;从`objc_object`到`NSObject`，联系都在这里。
+&emsp;&emsp;从`objc_object`到`NSObject`，微入宏观，联系都在这里。
 
 ## 3.1 Reference count
+
+&emsp;&emsp;在ObjC中，引用计数是内存管理的一种方式，从微观中的好几个地方，都已经见识它的细节，再来看看它的宏观体现。
+
+1. `isa`中的区别
+   1. `Tagged Pointer`的`isa`，没有使用引用计数
+   2. `nonpointer isa`，先以`isa`中`extra_rc`记录引用计数，当将要溢出时，标识`has_sidetable_rc`，并让一半的引用计数移交`SideTable`记录
+   3. `raw isa`，引用计数全由`SideTable`记录
+2. `ivar`中的区别
+   1. `class_ro_t`中，`ivarLayout`主要记录强引用变量的内存布局数量，弱引用的变量能忽略就忽略
+   2. `class_ro_t`中，`weakIvarLayout`主要记录弱引用变量的内存布局数量，强引用的变量能忽略就忽略
+   3. `class_ro_t`中，`ivars`中除了`ivarLayout`和`weakIvarLayout`中记录的布局变量外，都是不使用引用计数的变量
+3. 
 
 ## 3.2 `SEL` & `IMP`
 
