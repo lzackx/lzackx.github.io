@@ -1621,14 +1621,38 @@ struct weak_table_t {
 &emsp;&emsp;在ObjC中，引用计数是内存管理的一种方式，从微观中的好几个地方，都已经见识它的细节，再来看看它的宏观体现。
 
 1. `isa`中的区别
-   1. `Tagged Pointer`的`isa`，没有使用引用计数
+   1. `Tagged Pointer`的`isa`，没有使用引用计数，有返回值的相关统一处理的代码处都会直接返回`id`本身
    2. `nonpointer isa`，先以`isa`中`extra_rc`记录引用计数，当将要溢出时，标识`has_sidetable_rc`，并让一半的引用计数移交`SideTable`记录
    3. `raw isa`，引用计数全由`SideTable`记录
 2. `ivar`中的区别
    1. `class_ro_t`中，`ivarLayout`主要记录强引用变量的内存布局数量，弱引用的变量能忽略就忽略
    2. `class_ro_t`中，`weakIvarLayout`主要记录弱引用变量的内存布局数量，强引用的变量能忽略就忽略
    3. `class_ro_t`中，`ivars`中除了`ivarLayout`和`weakIvarLayout`中记录的布局变量外，都是不使用引用计数的变量
-3. 
+3. 强引用与弱引用的记录方式区别
+   1. `SideTable`中的强引用以`RefcountMap`（即`objc::DenseMap<DisguisedPtr<objc_object>,size_t,RefcountMapValuePurgeable>`）类型记录引用计数，散列表，key为伪装对象指针，value为引用计数
+   2. `SideTable`中的弱引用以`weak_table_t`（即`struct weak_table_t`）类型记录引用计数，内部维护`weak_entry_t`，散列表，`referent`（`DisguisedPtr<objc_object>`）是被引用的对象实例（理解为value）的伪装对象指针，`referer`(`weak_referrer_t`，也是`DisguisedPtr<objc_object *>`)是弱引用容器指针地址（指向弱引用指针地址的指针），可通过如下代码简单理解：
+```ObjC
+/*
+    假设初始化传递的String参数为不是 Tagged Pointer isa的其他类强引用了的字符串对象实例
+    @property 关键字包含 ivar + getter + setter
+    那么
+    ivar _rawISAString 就是 referer
+    参数string 就是 referent
+*/
+@interface ZObject : NSObject
+@property (weak) NSString *rawISAString;
+@end
+
+@implement ZObject
+- (id)initWithString:(NSString *)string {
+    self = [super init];
+    if (self) {
+        self.rawISAString = string;
+    }
+    return self;
+}
+@end
+```
 
 ## 3.2 `SEL` & `IMP`
 
