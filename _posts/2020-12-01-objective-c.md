@@ -1630,7 +1630,7 @@ struct weak_table_t {
    3. `class_ro_t`中，`ivars`中除了`ivarLayout`和`weakIvarLayout`中记录的布局变量外，都是不使用引用计数的变量
 3. 强引用与弱引用的记录方式区别
    1. `SideTable`中的强引用以`RefcountMap`（即`objc::DenseMap<DisguisedPtr<objc_object>,size_t,RefcountMapValuePurgeable>`）类型记录引用计数，散列表，key为伪装对象指针，value为引用计数
-   2. `SideTable`中的弱引用以`weak_table_t`（即`struct weak_table_t`）类型记录引用计数，内部维护`weak_entry_t`，散列表，`referent`（`DisguisedPtr<objc_object>`）是被引用的对象实例（理解为value）的伪装对象指针，`referer`(`weak_referrer_t`，也是`DisguisedPtr<objc_object *>`)是弱引用容器指针地址（指向弱引用指针地址的指针），可通过如下代码简单理解：
+   2. `SideTable`中的弱引用以`weak_table_t`（即`struct weak_table_t`）类型记录引用计数，内部维护`weak_entry_t`，散列表，`referent`（`DisguisedPtr<objc_object>`）是被引用的对象实例（理解为value）的伪装对象指针，`referer`(`weak_referrer_t`，也是`DisguisedPtr<objc_object *>`)是弱引用容器指针地址（指向弱引用指针地址的指针），可通过如下代码简单理解，
 ```ObjC
 /*
     假设初始化传递的String参数为不是 Tagged Pointer isa的其他类强引用了的字符串对象实例
@@ -1663,6 +1663,8 @@ struct weak_table_t {
 ## 3.5 Association object
 
 ## 3.6 Autoreleasepool
+
+&emsp;&emsp;
 
 
 *to be continue*
