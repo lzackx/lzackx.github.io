@@ -1665,7 +1665,653 @@ struct weak_table_t {
 
 ## 3.6 Autoreleasepool
 
-&emsp;&emsp;
+&emsp;&emsp;自动释放池是ObjC中处理释放内存的机制，而在每个工程的入口文件`main.m`中，我们也能看到它的存在，即:
 
+```ObjC
+@autoreleasepool {}
+```
+
+&emsp;&emsp;这是在`ARC`中的自动释放池使用方式，它的本质是成对地调用了下面的函数：
+
+```ObjC
+void *
+objc_autoreleasePoolPush(void)
+{
+    return AutoreleasePoolPage::push();
+}
+
+NEVER_INLINE
+void
+objc_autoreleasePoolPop(void *ctxt)
+{
+    AutoreleasePoolPage::pop(ctxt);
+}
+```
+
+&emsp;&emsp;这样就引申出了`class AutoreleasePoolPage`这个类，这是个按页分离的双向链表，先来看看类中的情况：
+
+```ObjC
+/***********************************************************************
+   Autorelease pool implementation
+
+   A thread's autorelease pool is a stack of pointers. 
+   Each pointer is either an object to release, or POOL_BOUNDARY which is 
+     an autorelease pool boundary.
+   A pool token is a pointer to the POOL_BOUNDARY for that pool. When 
+     the pool is popped, every object hotter than the sentinel is released.
+   The stack is divided into a doubly-linked list of pages. Pages are added 
+     and deleted as necessary. 
+   Thread-local storage points to the hot page, where newly autoreleased 
+     objects are stored. 
+**********************************************************************/
+
+/*
+    ...
+*/
+
+class AutoreleasePoolPage : private AutoreleasePoolPageData
+{
+	friend struct thread_data_t;
+
+public:
+	static size_t const SIZE =
+#if PROTECT_AUTORELEASEPOOL
+		PAGE_MAX_SIZE;  // must be multiple of vm page size
+#else
+		PAGE_MIN_SIZE;  // size and alignment, power of 2
+#endif
+    
+private:
+	static pthread_key_t const key = AUTORELEASE_POOL_KEY;
+	static uint8_t const SCRIBBLE = 0xA3;  // 0xA3A3A3A3 after releasing
+	static size_t const COUNT = SIZE / sizeof(id);
+
+    // EMPTY_POOL_PLACEHOLDER is stored in TLS when exactly one pool is 
+    // pushed and it has never contained any objects. This saves memory 
+    // when the top level (i.e. libdispatch) pushes and pops pools but 
+    // never uses them.
+#   define EMPTY_POOL_PLACEHOLDER ((id*)1)
+
+#   define POOL_BOUNDARY nil
+
+    // SIZE-sizeof(*this) bytes of contents follow
+
+    static void * operator new(size_t size) {
+        return malloc_zone_memalign(malloc_default_zone(), SIZE, SIZE);
+    }
+    static void operator delete(void * p) {
+        return free(p);
+    }
+
+/*
+    ...
+*/
+
+}
+```
+
+&emsp;&emsp;从注释、变量与初始化函数中，可以先了解到一些自动释放池的设计
+
+1. 自动释放池只与当前线程相关，并且内部会以栈的方式记录需要释放的实例对象指针，并且`struct thread_data_t`是友元结构体
+2. 池中的存放实例对象指针前需要先把`POOL_BOUNDARY`，即`nil`入栈，用于做栈中的边界，也称作哨兵(sentinel)
+3. 自动释放池的每一页大小为`PAGE_MIN_SIZE`，即 `1 << 12`（定义于`vm_param.h`中），也就是4096字节，在`new`的时候就已经固定开辟了内存空间大小了
+
+&emsp;&emsp;深入查看私有继承的`struct AutoreleasePoolPageData`，如下：
+
+```ObjC
+struct magic_t {
+	static const uint32_t M0 = 0xA1A1A1A1;
+#   define M1 "AUTORELEASE!"
+	static const size_t M1_len = 12;
+	uint32_t m[4];
+
+	magic_t() {
+		ASSERT(M1_len == strlen(M1));
+		ASSERT(M1_len == 3 * sizeof(m[1]));
+
+		m[0] = M0;
+		strncpy((char *)&m[1], M1, M1_len);
+	}
+
+	~magic_t() {
+		// Clear magic before deallocation.
+		// This prevents some false positives in memory debugging tools.
+		// fixme semantically this should be memset_s(), but the
+		// compiler doesn't optimize that at all (rdar://44856676).
+		volatile uint64_t *p = (volatile uint64_t *)m;
+		p[0] = 0; p[1] = 0;
+	}
+
+	bool check() const {
+		return (m[0] == M0 && 0 == strncmp((char *)&m[1], M1, M1_len));
+	}
+
+	bool fastcheck() const {
+#if CHECK_AUTORELEASEPOOL
+		return check();
+#else
+		return (m[0] == M0);
+#endif
+	}
+
+#   undef M1
+};
+
+class AutoreleasePoolPage;
+struct AutoreleasePoolPageData
+{
+	magic_t const magic;
+	__unsafe_unretained id *next;
+	pthread_t const thread;
+	AutoreleasePoolPage * const parent;
+	AutoreleasePoolPage *child;
+	uint32_t const depth;
+	uint32_t hiwat;
+
+	AutoreleasePoolPageData(__unsafe_unretained id* _next, pthread_t _thread, AutoreleasePoolPage* _parent, uint32_t _depth, uint32_t _hiwat)
+		: magic(), next(_next), thread(_thread),
+		  parent(_parent), child(nil),
+		  depth(_depth), hiwat(_hiwat)
+	{
+	}
+};
+```
+
+&emsp;&emsp;因`class AutoreleasePoolPage`的继承，使它拥有了内部的私有变量，这里以元数据进行代称
+
+1. 经过计算，`class AutoreleasePoolPage`的元数据占用内存空间为 56 Bytes，那么可用于存放自动释放池中的实例对象指针的空间大小就是 「4096 - 56 = 4040」Bytes，即 505 个指向`struct objc_object`的指针
+2. 元数据解释
+   1. `magic`，`struct magic_t`类型，人为用来标识自动释放池内存页是否正常的结构
+   2. `next`，`id`类型，自动释放池中的实例对象存储的栈顶指针
+   3. `thread`，`pthread_t`类型，当前线程
+   4. `parent`，`AutoreleasePoolPage`类型，双向链表的前一个指向
+   5. `child`，`AutoreleasePoolPage`类型，双向链表的后一个指向
+   6. `depth`，`uint32_t`类型，当前节点在双向链表中的深度
+   7. `hiwat`，`uint32_t`类型，high water，所有自动释放池实际占用了的内存容量
+
+&emsp;&emsp;回归到调用流程，以下为`class AutoreleasePoolPage`中自动释放池会调用到的函数：
+
+```ObjC
+class AutoreleasePoolPage : private AutoreleasePoolPageData
+{
+	
+    /*
+        前面已经描述的部分，这里忽略
+    */
+
+    template<typename Fn>
+    void
+    busted(Fn log) const
+    {
+        magic_t right;
+        log("autorelease pool page %p corrupted\n"
+             "  magic     0x%08x 0x%08x 0x%08x 0x%08x\n"
+             "  should be 0x%08x 0x%08x 0x%08x 0x%08x\n"
+             "  pthread   %p\n"
+             "  should be %p\n", 
+             this, 
+             magic.m[0], magic.m[1], magic.m[2], magic.m[3], 
+             right.m[0], right.m[1], right.m[2], right.m[3], 
+             this->thread, objc_thread_self());
+    }
+
+    __attribute__((noinline, cold, noreturn))
+    void
+    busted_die() const
+    {
+        busted(_objc_fatal);
+        __builtin_unreachable();
+    }
+
+    inline void
+    check(bool die = true) const
+    {
+        if (!magic.check() || thread != objc_thread_self()) {
+            if (die) {
+                busted_die();
+            } else {
+                busted(_objc_inform);
+            }
+        }
+    }
+
+    inline void
+    fastcheck() const
+    {
+#if CHECK_AUTORELEASEPOOL
+        check();
+#else
+        if (! magic.fastcheck()) {
+            busted_die();
+        }
+#endif
+    }
+
+
+    id * begin() {
+        return (id *) ((uint8_t *)this+sizeof(*this));
+    }
+
+    id * end() {
+        return (id *) ((uint8_t *)this+SIZE);
+    }
+
+    bool empty() {
+        return next == begin();
+    }
+
+    bool full() { 
+        return next == end();
+    }
+
+    bool lessThanHalfFull() {
+        return (next - begin() < (end() - begin()) / 2);
+    }
+
+    id *add(id obj)
+    {
+        ASSERT(!full());
+        unprotect();
+        id *ret = next;  // faster than `return next-1` because of aliasing
+        *next++ = obj;
+        protect();
+        return ret;
+    }
+
+    void releaseAll() 
+    {
+        releaseUntil(begin());
+    }
+
+    void releaseUntil(id *stop) 
+    {
+        // Not recursive: we don't want to blow out the stack 
+        // if a thread accumulates a stupendous amount of garbage
+        
+        while (this->next != stop) {
+            // Restart from hotPage() every time, in case -release 
+            // autoreleased more objects
+            AutoreleasePoolPage *page = hotPage();
+
+            // fixme I think this `while` can be `if`, but I can't prove it
+            while (page->empty()) {
+                page = page->parent;
+                setHotPage(page);
+            }
+
+            page->unprotect();
+            id obj = *--page->next;
+            memset((void*)page->next, SCRIBBLE, sizeof(*page->next));
+            page->protect();
+
+            if (obj != POOL_BOUNDARY) {
+                objc_release(obj);
+            }
+        }
+
+        setHotPage(this);
+
+#if DEBUG
+        // we expect any children to be completely empty
+        for (AutoreleasePoolPage *page = child; page; page = page->child) {
+            ASSERT(page->empty());
+        }
+#endif
+    }
+
+    void kill() 
+    {
+        // Not recursive: we don't want to blow out the stack 
+        // if a thread accumulates a stupendous amount of garbage
+        AutoreleasePoolPage *page = this;
+        while (page->child) page = page->child;
+
+        AutoreleasePoolPage *deathptr;
+        do {
+            deathptr = page;
+            page = page->parent;
+            if (page) {
+                page->unprotect();
+                page->child = nil;
+                page->protect();
+            }
+            delete deathptr;
+        } while (deathptr != this);
+    }
+
+    static void tls_dealloc(void *p) 
+    {
+        if (p == (void*)EMPTY_POOL_PLACEHOLDER) {
+            // No objects or pool pages to clean up here.
+            return;
+        }
+
+        // reinstate TLS value while we work
+        setHotPage((AutoreleasePoolPage *)p);
+
+        if (AutoreleasePoolPage *page = coldPage()) {
+            if (!page->empty()) objc_autoreleasePoolPop(page->begin());  // pop all of the pools
+            if (slowpath(DebugMissingPools || DebugPoolAllocation)) {
+                // pop() killed the pages already
+            } else {
+                page->kill();  // free all of the pages
+            }
+        }
+        
+        // clear TLS value so TLS destruction doesn't loop
+        setHotPage(nil);
+    }
+
+    static AutoreleasePoolPage *pageForPointer(const void *p) 
+    {
+        return pageForPointer((uintptr_t)p);
+    }
+
+    static AutoreleasePoolPage *pageForPointer(uintptr_t p) 
+    {
+        AutoreleasePoolPage *result;
+        uintptr_t offset = p % SIZE;
+
+        ASSERT(offset >= sizeof(AutoreleasePoolPage));
+
+        result = (AutoreleasePoolPage *)(p - offset);
+        result->fastcheck();
+
+        return result;
+    }
+
+
+    static inline bool haveEmptyPoolPlaceholder()
+    {
+        id *tls = (id *)tls_get_direct(key);
+        return (tls == EMPTY_POOL_PLACEHOLDER);
+    }
+
+    static inline id* setEmptyPoolPlaceholder()
+    {
+        ASSERT(tls_get_direct(key) == nil);
+        tls_set_direct(key, (void *)EMPTY_POOL_PLACEHOLDER);
+        return EMPTY_POOL_PLACEHOLDER;
+    }
+
+    static inline AutoreleasePoolPage *hotPage() 
+    {
+        AutoreleasePoolPage *result = (AutoreleasePoolPage *)
+            tls_get_direct(key);
+        if ((id *)result == EMPTY_POOL_PLACEHOLDER) return nil;
+        if (result) result->fastcheck();
+        return result;
+    }
+
+    static inline void setHotPage(AutoreleasePoolPage *page) 
+    {
+        if (page) page->fastcheck();
+        tls_set_direct(key, (void *)page);
+    }
+
+    static inline AutoreleasePoolPage *coldPage() 
+    {
+        AutoreleasePoolPage *result = hotPage();
+        if (result) {
+            while (result->parent) {
+                result = result->parent;
+                result->fastcheck();
+            }
+        }
+        return result;
+    }
+
+
+    static inline id *autoreleaseFast(id obj)
+    {
+        AutoreleasePoolPage *page = hotPage();
+        if (page && !page->full()) {
+            return page->add(obj);
+        } else if (page) {
+            return autoreleaseFullPage(obj, page);
+        } else {
+            return autoreleaseNoPage(obj);
+        }
+    }
+
+    static __attribute__((noinline))
+    id *autoreleaseFullPage(id obj, AutoreleasePoolPage *page)
+    {
+        // The hot page is full. 
+        // Step to the next non-full page, adding a new page if necessary.
+        // Then add the object to that page.
+        ASSERT(page == hotPage());
+        ASSERT(page->full()  ||  DebugPoolAllocation);
+
+        do {
+            if (page->child) page = page->child;
+            else page = new AutoreleasePoolPage(page);
+        } while (page->full());
+
+        setHotPage(page);
+        return page->add(obj);
+    }
+
+    static __attribute__((noinline))
+    id *autoreleaseNoPage(id obj)
+    {
+        // "No page" could mean no pool has been pushed
+        // or an empty placeholder pool has been pushed and has no contents yet
+        ASSERT(!hotPage());
+
+        bool pushExtraBoundary = false;
+        if (haveEmptyPoolPlaceholder()) {
+            // We are pushing a second pool over the empty placeholder pool
+            // or pushing the first object into the empty placeholder pool.
+            // Before doing that, push a pool boundary on behalf of the pool 
+            // that is currently represented by the empty placeholder.
+            pushExtraBoundary = true;
+        }
+        else if (obj != POOL_BOUNDARY  &&  DebugMissingPools) {
+            // We are pushing an object with no pool in place, 
+            // and no-pool debugging was requested by environment.
+            _objc_inform("MISSING POOLS: (%p) Object %p of class %s "
+                         "autoreleased with no pool in place - "
+                         "just leaking - break on "
+                         "objc_autoreleaseNoPool() to debug", 
+                         objc_thread_self(), (void*)obj, object_getClassName(obj));
+            objc_autoreleaseNoPool(obj);
+            return nil;
+        }
+        else if (obj == POOL_BOUNDARY  &&  !DebugPoolAllocation) {
+            // We are pushing a pool with no pool in place,
+            // and alloc-per-pool debugging was not requested.
+            // Install and return the empty pool placeholder.
+            return setEmptyPoolPlaceholder();
+        }
+
+        // We are pushing an object or a non-placeholder'd pool.
+
+        // Install the first page.
+        AutoreleasePoolPage *page = new AutoreleasePoolPage(nil);
+        setHotPage(page);
+        
+        // Push a boundary on behalf of the previously-placeholder'd pool.
+        if (pushExtraBoundary) {
+            page->add(POOL_BOUNDARY);
+        }
+        
+        // Push the requested object or pool.
+        return page->add(obj);
+    }
+
+
+    static __attribute__((noinline))
+    id *autoreleaseNewPage(id obj)
+    {
+        AutoreleasePoolPage *page = hotPage();
+        if (page) return autoreleaseFullPage(obj, page);
+        else return autoreleaseNoPage(obj);
+    }
+
+public:
+    static inline id autorelease(id obj)
+    {
+        ASSERT(obj);
+        ASSERT(!obj->isTaggedPointer());
+        id *dest __unused = autoreleaseFast(obj);
+        ASSERT(!dest  ||  dest == EMPTY_POOL_PLACEHOLDER  ||  *dest == obj);
+        return obj;
+    }
+
+
+    static inline void *push() 
+    {
+        id *dest;
+        if (slowpath(DebugPoolAllocation)) {
+            // Each autorelease pool starts on a new pool page.
+            dest = autoreleaseNewPage(POOL_BOUNDARY);
+        } else {
+            dest = autoreleaseFast(POOL_BOUNDARY);
+        }
+        ASSERT(dest == EMPTY_POOL_PLACEHOLDER || *dest == POOL_BOUNDARY);
+        return dest;
+    }
+
+    __attribute__((noinline, cold))
+    static void badPop(void *token)
+    {
+        // Error. For bincompat purposes this is not 
+        // fatal in executables built with old SDKs.
+
+        if (DebugPoolAllocation || sdkIsAtLeast(10_12, 10_0, 10_0, 3_0, 2_0)) {
+            // OBJC_DEBUG_POOL_ALLOCATION or new SDK. Bad pop is fatal.
+            _objc_fatal
+                ("Invalid or prematurely-freed autorelease pool %p.", token);
+        }
+
+        // Old SDK. Bad pop is warned once.
+        static bool complained = false;
+        if (!complained) {
+            complained = true;
+            _objc_inform_now_and_on_crash
+                ("Invalid or prematurely-freed autorelease pool %p. "
+                 "Set a breakpoint on objc_autoreleasePoolInvalid to debug. "
+                 "Proceeding anyway because the app is old "
+                 "(SDK version " SDK_FORMAT "). Memory errors are likely.",
+                     token, FORMAT_SDK(sdkVersion()));
+        }
+        objc_autoreleasePoolInvalid(token);
+    }
+
+    template<bool allowDebug>
+    static void
+    popPage(void *token, AutoreleasePoolPage *page, id *stop)
+    {
+        if (allowDebug && PrintPoolHiwat) printHiwat();
+
+        page->releaseUntil(stop);
+
+        // memory: delete empty children
+        if (allowDebug && DebugPoolAllocation  &&  page->empty()) {
+            // special case: delete everything during page-per-pool debugging
+            AutoreleasePoolPage *parent = page->parent;
+            page->kill();
+            setHotPage(parent);
+        } else if (allowDebug && DebugMissingPools  &&  page->empty()  &&  !page->parent) {
+            // special case: delete everything for pop(top)
+            // when debugging missing autorelease pools
+            page->kill();
+            setHotPage(nil);
+        } else if (page->child) {
+            // hysteresis: keep one empty child if page is more than half full
+            if (page->lessThanHalfFull()) {
+                page->child->kill();
+            }
+            else if (page->child->child) {
+                page->child->child->kill();
+            }
+        }
+    }
+
+    __attribute__((noinline, cold))
+    static void
+    popPageDebug(void *token, AutoreleasePoolPage *page, id *stop)
+    {
+        popPage<true>(token, page, stop);
+    }
+
+    static inline void
+    pop(void *token)
+    {
+        AutoreleasePoolPage *page;
+        id *stop;
+        if (token == (void*)EMPTY_POOL_PLACEHOLDER) {
+            // Popping the top-level placeholder pool.
+            page = hotPage();
+            if (!page) {
+                // Pool was never used. Clear the placeholder.
+                return setHotPage(nil);
+            }
+            // Pool was used. Pop its contents normally.
+            // Pool pages remain allocated for re-use as usual.
+            page = coldPage();
+            token = page->begin();
+        } else {
+            page = pageForPointer(token);
+        }
+
+        stop = (id *)token;
+        if (*stop != POOL_BOUNDARY) {
+            if (stop == page->begin()  &&  !page->parent) {
+                // Start of coldest page may correctly not be POOL_BOUNDARY:
+                // 1. top-level pool is popped, leaving the cold page in place
+                // 2. an object is autoreleased with no pool
+            } else {
+                // Error. For bincompat purposes this is not 
+                // fatal in executables built with old SDKs.
+                return badPop(token);
+            }
+        }
+
+        if (slowpath(PrintPoolHiwat || DebugPoolAllocation || DebugMissingPools)) {
+            return popPageDebug(token, page, stop);
+        }
+
+        return popPage<false>(token, page, stop);
+    }
+
+    static void init()
+    {
+        int r __unused = pthread_key_init_np(AutoreleasePoolPage::key, 
+                                             AutoreleasePoolPage::tls_dealloc);
+        ASSERT(r == 0);
+    }
+
+    
+    /*
+        打印函数部分的代码忽略
+    */
+
+#undef POOL_BOUNDARY
+};
+```
+
+&emsp;&emsp;即使忽略了部分，代码部分也还是有点长，这里从入栈到出栈的角度进行描述（`push` -> `pop`）
+
+1. 初始化处理：`static inline void *push()`，就是`void *objc_autoreleasePoolPush(void)`中的实现，在正常的设备运行流程中，调用`static inline id *autoreleaseFast(id obj)`函数，参数是`POOL_BOUNDARY`，然后返回`EMPTY_POOL_PLACEHOLDER`，即自动释放池空占位符
+2. 入栈前处理：按照入栈场景有3种情况
+   1. 已初始化自动释放池页，且页内栈不满：直接将实例对象入栈
+   2. 已初始化自动释放池页，但栈已满的情况下：通过双向链表遍历，找到不满的自动释放池页（如果都是满的，就新建一页），并设置为`hotPage`（当前线程处理中的页，tls，即`Thread Local Storage`），最后将实例对象入栈
+   3. 自动释放池页未初始化的情况下（这是最完整的自动释放池页入栈流程），先查当前线程是否有空的内存释放池占位符`EMPTY_POOL_PLACEHOLDER`
+      1. 没有且没有打开自动释放池调试环境变量，则会先设置并返回这个内存释放池占位符`EMPTY_POOL_PLACEHOLDER`
+      2. 有就代表自动释放池页是空栈，在创建了第一个自动释放池页并设置为`hotPage`后，如果知道这是空栈，那么页中的栈低就需要添加一个哨兵（`sentinel`，即`POOL_BOUNDARY`，也就是`nil`）对象，用于标识栈底，最后将实例对象入栈
+3. 入栈时处理：通过`id *add(id obj)`函数入栈，并将栈顶指针`next`指向刚入栈的实例对象
+4. 出栈前处理：`static inline void pop(void *token)`，就是`void _objc_autoreleasePoolPop(void *ctxt)`中的实现，函数的参数对应追踪可知，是实例对象在入栈后的栈顶，在出栈函数调用时，需要通过栈顶找到自动释放池页，此处也分3种情况
+   1. `token`是自动释放池占位符，即栈是空的
+      1. 如果从未有实例对象入栈，那就是空的，置空`hotPage`，不需要更多处理（这种情况通常是花括号里为空的时候）
+      2. 如果已有实例对象入栈，但是在自动释放池结束前已经出栈，就准备在`codePage`内出栈，直到`begin`，可以理解为第一个自动释放池内全部出栈，直到空栈（不包括哨兵`POOL_BOUNDARY`），空栈后自动释放池页仍会保留作重用
+   2. `token`不是自动释放池占位符，栈内有需要实例对象指针，通过`static AutoreleasePoolPage *pageForPointer(uintptr_t p) `与`token`获得自动释放池页，此处需要注意一个当前版本设计得非常精妙的处理
+      1. 在首次调用`push`函数的时候，因为需要初始化自动释放池页，所以走的是`autoreleaseNoPage(POOL_BOUNDARY)`，返回的是内存释放池占位符`EMPTY_POOL_PLACEHOLDER`，即`((id*)1)`
+      2. 这个内存释放池占位符`EMPTY_POOL_PLACEHOLDER`指向的地址是没有数据的，所以在`pop`函数内部的`stop = (id *)token;`获得的值与`POOL_BOUNDARY`相同，为`nil`，所以接下来想通的出栈操作不相悖
+5. 出栈时处理：通过`template<bool allowDebug> static void popPage(void *token, AutoreleasePoolPage *page, id *stop)`函数同时处理出栈与自动释放池页的删除
+   1. 首先用`releaseUntil`循环出栈每一个池子中的实例对象指针，需要注意的是循环内单独判断了哨兵不出栈，并且因为哨兵`POOL_BOUNDARY`的值为`nil`，所以出栈操作是以`SCRIBBLE`，即`0xA3`来赋值，字面意思是涂掉
+   2. 然后判断当前自动释放池页的容量，如果少于一半就删除双向链表中的下个节点，否则保留
+6. 除了日常写代码时接触到的自动释放池使用，在`Runloop`中也有调用，其释放调用的是`static void tls_dealloc(void *p) `，具体细节在`CF`篇章再深究
 
 *to be continue*
