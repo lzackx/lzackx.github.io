@@ -1875,7 +1875,257 @@ void objc_setProperty_nonatomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t o
 
 ## 3.4 Category & Extension
 
+&emsp;&emsp;
+
 ## 3.5 Association object
+
+&emsp;&emsp;`Association object`，关联对象，通常在`Category`中用于创建`property`用到，因为`Category`与原类的加载时间不一样，所以原类内存中`ivar`的空间无法为了`category`中的`property`开辟空间，于是为了实现运行时的特性，就有了`Association object`。
+
+&emsp;&emsp;先看看`get`和`set`函数，`ChainedHookFunction`是个泛型模版，`SetAssocHook`类内封装了设置关联对象的函数。
+
+```ObjC
+id
+objc_getAssociatedObject(id object, const void *key)
+{
+    return _object_get_associative_reference(object, key);
+}
+
+static ChainedHookFunction<objc_hook_setAssociatedObject> SetAssocHook{_base_objc_setAssociatedObject};
+
+void
+objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationPolicy policy)
+{
+    SetAssocHook.get()(object, key, value, policy);
+}
+
+void objc_removeAssociatedObjects(id object) 
+{
+    if (object && object->hasAssociatedObjects()) {
+        _object_remove_assocations(object);
+    }
+}
+```
+
+&emsp;&emsp;再看内部的实现，位于`objc-references.mm`，如下：
+
+```ObjC
+#include "objc-private.h"
+#include <objc/message.h>
+#include <map>
+#include "DenseMapExtras.h"
+
+// expanded policy bits.
+
+enum {
+    OBJC_ASSOCIATION_SETTER_ASSIGN      = 0,
+    OBJC_ASSOCIATION_SETTER_RETAIN      = 1,
+    OBJC_ASSOCIATION_SETTER_COPY        = 3,            // NOTE:  both bits are set, so we can simply test 1 bit in releaseValue below.
+    OBJC_ASSOCIATION_GETTER_READ        = (0 << 8),
+    OBJC_ASSOCIATION_GETTER_RETAIN      = (1 << 8),
+    OBJC_ASSOCIATION_GETTER_AUTORELEASE = (2 << 8)
+};
+
+spinlock_t AssociationsManagerLock;
+
+namespace objc {
+
+class ObjcAssociation {
+    uintptr_t _policy;
+    id _value;
+public:
+    ObjcAssociation(uintptr_t policy, id value) : _policy(policy), _value(value) {}
+    ObjcAssociation() : _policy(0), _value(nil) {}
+    ObjcAssociation(const ObjcAssociation &other) = default;
+    ObjcAssociation &operator=(const ObjcAssociation &other) = default;
+    ObjcAssociation(ObjcAssociation &&other) : ObjcAssociation() {
+        swap(other);
+    }
+
+    inline void swap(ObjcAssociation &other) {
+        std::swap(_policy, other._policy);
+        std::swap(_value, other._value);
+    }
+
+    inline uintptr_t policy() const { return _policy; }
+    inline id value() const { return _value; }
+
+    inline void acquireValue() {
+        if (_value) {
+            switch (_policy & 0xFF) {
+            case OBJC_ASSOCIATION_SETTER_RETAIN:
+                _value = objc_retain(_value);
+                break;
+            case OBJC_ASSOCIATION_SETTER_COPY:
+                _value = ((id(*)(id, SEL))objc_msgSend)(_value, @selector(copy));
+                break;
+            }
+        }
+    }
+
+    inline void releaseHeldValue() {
+        if (_value && (_policy & OBJC_ASSOCIATION_SETTER_RETAIN)) {
+            objc_release(_value);
+        }
+    }
+
+    inline void retainReturnedValue() {
+        if (_value && (_policy & OBJC_ASSOCIATION_GETTER_RETAIN)) {
+            objc_retain(_value);
+        }
+    }
+
+    inline id autoreleaseReturnedValue() {
+        if (slowpath(_value && (_policy & OBJC_ASSOCIATION_GETTER_AUTORELEASE))) {
+            return objc_autorelease(_value);
+        }
+        return _value;
+    }
+};
+
+typedef DenseMap<const void *, ObjcAssociation> ObjectAssociationMap;
+typedef DenseMap<DisguisedPtr<objc_object>, ObjectAssociationMap> AssociationsHashMap;
+
+// class AssociationsManager manages a lock / hash table singleton pair.
+// Allocating an instance acquires the lock
+
+class AssociationsManager {
+    using Storage = ExplicitInitDenseMap<DisguisedPtr<objc_object>, ObjectAssociationMap>;
+    static Storage _mapStorage;
+
+public:
+    AssociationsManager()   { AssociationsManagerLock.lock(); }
+    ~AssociationsManager()  { AssociationsManagerLock.unlock(); }
+
+    AssociationsHashMap &get() {
+        return _mapStorage.get();
+    }
+
+    static void init() {
+        _mapStorage.init();
+    }
+};
+
+AssociationsManager::Storage AssociationsManager::_mapStorage;
+
+} // namespace objc
+
+using namespace objc;
+
+void
+_objc_associations_init()
+{
+    AssociationsManager::init();
+}
+
+id
+_object_get_associative_reference(id object, const void *key)
+{
+    ObjcAssociation association{};
+
+    {
+        AssociationsManager manager;
+        AssociationsHashMap &associations(manager.get());
+        AssociationsHashMap::iterator i = associations.find((objc_object *)object);
+        if (i != associations.end()) {
+            ObjectAssociationMap &refs = i->second;
+            ObjectAssociationMap::iterator j = refs.find(key);
+            if (j != refs.end()) {
+                association = j->second;
+                association.retainReturnedValue();
+            }
+        }
+    }
+
+    return association.autoreleaseReturnedValue();
+}
+
+void
+_object_set_associative_reference(id object, const void *key, id value, uintptr_t policy)
+{
+    // This code used to work when nil was passed for object and key. Some code
+    // probably relies on that to not crash. Check and handle it explicitly.
+    // rdar://problem/44094390
+    if (!object && !value) return;
+
+    if (object->getIsa()->forbidsAssociatedObjects())
+        _objc_fatal("objc_setAssociatedObject called on instance (%p) of class %s which does not allow associated objects", object, object_getClassName(object));
+
+    DisguisedPtr<objc_object> disguised{(objc_object *)object};
+    ObjcAssociation association{policy, value};
+
+    // retain the new value (if any) outside the lock.
+    association.acquireValue();
+
+    {
+        AssociationsManager manager;
+        AssociationsHashMap &associations(manager.get());
+
+        if (value) {
+            auto refs_result = associations.try_emplace(disguised, ObjectAssociationMap{});
+            if (refs_result.second) {
+                /* it's the first association we make */
+                object->setHasAssociatedObjects();
+            }
+
+            /* establish or replace the association */
+            auto &refs = refs_result.first->second;
+            auto result = refs.try_emplace(key, std::move(association));
+            if (!result.second) {
+                association.swap(result.first->second);
+            }
+        } else {
+            auto refs_it = associations.find(disguised);
+            if (refs_it != associations.end()) {
+                auto &refs = refs_it->second;
+                auto it = refs.find(key);
+                if (it != refs.end()) {
+                    association.swap(it->second);
+                    refs.erase(it);
+                    if (refs.size() == 0) {
+                        associations.erase(refs_it);
+
+                    }
+                }
+            }
+        }
+    }
+
+    // release the old value (outside of the lock).
+    association.releaseHeldValue();
+}
+
+// Unlike setting/getting an associated reference,
+// this function is performance sensitive because of
+// raw isa objects (such as OS Objects) that can't track
+// whether they have associated objects.
+void
+_object_remove_assocations(id object)
+{
+    ObjectAssociationMap refs{};
+
+    {
+        AssociationsManager manager;
+        AssociationsHashMap &associations(manager.get());
+        AssociationsHashMap::iterator i = associations.find((objc_object *)object);
+        if (i != associations.end()) {
+            refs.swap(i->second);
+            associations.erase(i);
+        }
+    }
+
+    // release everything (outside of the lock).
+    for (auto &i: refs) {
+        i.second.releaseHeldValue();
+    }
+}
+```
+
+&emsp;&emsp;关联对象内在实现其实是`class AssociationsManager`的函数调用，其中管理内存的也是散列表，并且进行了套娃，数据关系如下：
+
+1. `AssociationsHashMap`，key是`DisguisedPtr<objc_object>`，value是`ObjectAssociationMap`
+2. `ObjectAssociationMap`，key是`const void *`，value是`ObjcAssociation`（内有策略与值）
+   
+&emsp;&emsp;套娃的散列表各有指向，在处理关联对象的时候，也会根据内存策略来判断引用方式，同时对于`isa`，也会标识出是否有关联对象。
 
 ## 3.6 Autoreleasepool
 
@@ -2528,4 +2778,19 @@ public:
    2. 然后判断当前自动释放池页的容量，如果少于一半就删除双向链表中的下个节点，否则保留
 6. 除了日常写代码时接触到的自动释放池使用，在`Runloop`中也有调用，其释放调用的是`static void tls_dealloc(void *p) `，具体细节在`CF`篇章再深究
 
-*to be continue*
+
+&emsp;&emsp;最后对宏观中的3个部分做一个入口总览，在首次初始化镜像的时候，初始化流程会先把3个用于管理内存的散列表初始化，调用顺序如下：
+
+1. `void map_images(unsigned count, const char * const paths[], const struct mach_header * const mhdrs[])`
+2. `void map_images_nolock(unsigned mhCount, const char * const mhPaths[], const struct mach_header * const mhdrs[])`
+3. `void arr_init(void) `
+
+&emsp;&emsp;`void arr_init(void) `函数中有对`AutoreleasePoolPage`、`SideTableMap`和`AssociationsManager`的初始化，它们都是统一用于管理各方面的散列表，首次初始化镜像时初始化构成了管理运行时内存的基础
+```ObjC
+void arr_init(void) 
+{
+    AutoreleasePoolPage::init();
+    SideTablesMap.init();
+    _objc_associations_init();
+}
+```
