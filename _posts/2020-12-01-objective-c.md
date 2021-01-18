@@ -1657,7 +1657,129 @@ struct weak_table_t {
 
 ## 3.2 `SEL` & `IMP`
 
+&emsp;&emsp;从微观上看一个ObjC类，即`struct objc_class`，方法的本质是`SEL`和`IMP`，它们在`class_ro_t`中被`method_list_t`类型的变量（即列表）管理，列表元素是`struct method_t`，`SEL`与`IMP`（即`MethodListIMP`）就在内部，代码如下：
+
+```ObjC
+struct method_t {
+    SEL name;
+    const char *types;
+    MethodListIMP imp;
+
+    struct SortBySELAddress :
+        public std::binary_function<const method_t&,
+                                    const method_t&, bool>
+    {
+        bool operator() (const method_t& lhs,
+                         const method_t& rhs)
+        { return lhs.name < rhs.name; }
+    };
+};
+```
+
+&emsp;&emsp;在宏观上来看，方法在被调用时，会被缓存到`objc_class`的`cache`中。而从方法调用的角度上看，ObjC中的方法调用被叫作消息发送，原因可看`message.h`内的代码：
+
+```ObjC
+#include <objc/objc.h>
+#include <objc/runtime.h>
+
+/*
+    ...
+*/
+
+
+/* Basic Messaging Primitives
+ *
+ * On some architectures, use objc_msgSend_stret for some struct return types.
+ * On some architectures, use objc_msgSend_fpret for some float return types.
+ * On some architectures, use objc_msgSend_fp2ret for some float return types.
+ *
+ * These functions must be cast to an appropriate function pointer type 
+ * before being called. 
+ */
+#if !OBJC_OLD_DISPATCH_PROTOTYPES
+/*
+    ...
+*/
+#else
+/** 
+ * Sends a message with a simple return value to an instance of a class.
+ * 
+ * @param self A pointer to the instance of the class that is to receive the message.
+ * @param op The selector of the method that handles the message.
+ * @param ... 
+ *   A variable argument list containing the arguments to the method.
+ * 
+ * @return The return value of the method.
+ * 
+ * @note When it encounters a method call, the compiler generates a call to one of the
+ *  functions \c objc_msgSend, \c objc_msgSend_stret, \c objc_msgSendSuper, or \c objc_msgSendSuper_stret.
+ *  Messages sent to an object’s superclass (using the \c super keyword) are sent using \c objc_msgSendSuper; 
+ *  other messages are sent using \c objc_msgSend. Methods that have data structures as return values
+ *  are sent using \c objc_msgSendSuper_stret and \c objc_msgSend_stret.
+ */
+OBJC_EXPORT id _Nullable
+objc_msgSend(id _Nullable self, SEL _Nonnull op, ...)
+    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+/** 
+ * Sends a message with a simple return value to the superclass of an instance of a class.
+ * 
+ * @param super A pointer to an \c objc_super data structure. Pass values identifying the
+ *  context the message was sent to, including the instance of the class that is to receive the
+ *  message and the superclass at which to start searching for the method implementation.
+ * @param op A pointer of type SEL. Pass the selector of the method that will handle the message.
+ * @param ...
+ *   A variable argument list containing the arguments to the method.
+ * 
+ * @return The return value of the method identified by \e op.
+ * 
+ * @see objc_msgSend
+ */
+OBJC_EXPORT id _Nullable
+objc_msgSendSuper(struct objc_super * _Nonnull super, SEL _Nonnull op, ...)
+    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+#endif
+```
+
+&emsp;&emsp;注释中可以看到`objc_msgSend`函数的参数
+
+1. `id`，消息接收者，通过实例对象的`isa`可找到`objc_class`
+2. `SEL`，方法选择器，从`id`中找到的`objc_class`中的`class_ro_t`寻找配对的`SEL`
+3. 不定参数，对应消失发送时的参数
+
+&emsp;&emsp;再看`objc_msgSendSuper`函数，与`objc_msgSend`不同的是，首个参数是`struct objc_super * _Nonnull super`，本质上相同，只是多了从实例对象的类中再找父类，但是消息接收的目标还是与`objc_msgSend`相同的实例对象自己。这也是ObjC中`super`关键字的调用中为什么与`self`关键字打印想通实例对象的原因（消息接收者相同）。
+
+```ObjC
+#ifndef OBJC_SUPER
+#define OBJC_SUPER
+
+/// Specifies the superclass of an instance. 
+struct objc_super {
+    /// Specifies an instance of a class.
+    __unsafe_unretained _Nonnull id receiver;
+
+    /// Specifies the particular superclass of the instance to message. 
+#if !defined(__cplusplus)  &&  !__OBJC2__
+    /* For compatibility with old objc-runtime.h header */
+    __unsafe_unretained _Nonnull Class class;
+#else
+    __unsafe_unretained _Nonnull Class super_class;
+#endif
+    /* super_class is the first class to search */
+};
+#endif
+```
+
+&emsp;&emsp;深入看`objc_msgSend`的实现，在源码中，实现是汇编语言写的，最好找arm手册对着看指令，这里不纠结具体寄存器的作用，只关注逻辑，`objc-msg-arm64.s`中调用`IMP`比较核心的步骤如下：
+
+1. `_objc_msgSend`
+2. `CacheLookup`
+3. `TailCallCachedImp`
+
+&emsp;&emsp;配合上`NSObject`中消息的分发机制，成就了消息发送的特性
+
 ## 3.3 Property
+
+&emsp;&emsp;在ARC中，`@property`关键字在编译器编译时，会生成`ivar`+`getter`+`setter`，并且在`setter`中处理引用计数（即按照关键字情况处理`objc_retain`）。
 
 ## 3.4 Category & Extension
 
