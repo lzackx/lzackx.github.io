@@ -1779,7 +1779,99 @@ struct objc_super {
 
 ## 3.3 Property
 
-&emsp;&emsp;在ARC中，`@property`关键字在编译器编译时，会生成`ivar`+`getter`+`setter`，并且在`setter`中处理引用计数（即按照关键字情况处理`objc_retain`）。
+&emsp;&emsp;在ARC中，`@property`关键字在编译器编译时，会生成`ivar`+`getter`+`setter`，并且在`setter`中处理引用计数（即按照关键字情况调用`objc_retain`和`objc_release`）。
+
+&emsp;&emsp;位于`objc-accesors.mm`中，有对应于各个关键字的实现：
+
+```ObjC
+id objc_getProperty(id self, SEL _cmd, ptrdiff_t offset, BOOL atomic) {
+    if (offset == 0) {
+        return object_getClass(self);
+    }
+
+    // Retain release world
+    id *slot = (id*) ((char*)self + offset);
+    if (!atomic) return *slot;
+        
+    // Atomic retain release world
+    spinlock_t& slotlock = PropertyLocks[slot];
+    slotlock.lock();
+    id value = objc_retain(*slot);
+    slotlock.unlock();
+    
+    // for performance, we (safely) issue the autorelease OUTSIDE of the spinlock.
+    return objc_autoreleaseReturnValue(value);
+}
+
+
+static inline void reallySetProperty(id self, SEL _cmd, id newValue, ptrdiff_t offset, bool atomic, bool copy, bool mutableCopy) __attribute__((always_inline));
+
+static inline void reallySetProperty(id self, SEL _cmd, id newValue, ptrdiff_t offset, bool atomic, bool copy, bool mutableCopy)
+{
+    if (offset == 0) {
+        object_setClass(self, newValue);
+        return;
+    }
+
+    id oldValue;
+    id *slot = (id*) ((char*)self + offset);
+
+    if (copy) {
+        newValue = [newValue copyWithZone:nil];
+    } else if (mutableCopy) {
+        newValue = [newValue mutableCopyWithZone:nil];
+    } else {
+        if (*slot == newValue) return;
+        newValue = objc_retain(newValue);
+    }
+
+    if (!atomic) {
+        oldValue = *slot;
+        *slot = newValue;
+    } else {
+        spinlock_t& slotlock = PropertyLocks[slot];
+        slotlock.lock();
+        oldValue = *slot;
+        *slot = newValue;        
+        slotlock.unlock();
+    }
+
+    objc_release(oldValue);
+}
+
+void objc_setProperty(id self, SEL _cmd, ptrdiff_t offset, id newValue, BOOL atomic, signed char shouldCopy) 
+{
+    bool copy = (shouldCopy && shouldCopy != MUTABLE_COPY);
+    bool mutableCopy = (shouldCopy == MUTABLE_COPY);
+    reallySetProperty(self, _cmd, newValue, offset, atomic, copy, mutableCopy);
+}
+
+void objc_setProperty_atomic(id self, SEL _cmd, id newValue, ptrdiff_t offset)
+{
+    reallySetProperty(self, _cmd, newValue, offset, true, false, false);
+}
+
+void objc_setProperty_nonatomic(id self, SEL _cmd, id newValue, ptrdiff_t offset)
+{
+    reallySetProperty(self, _cmd, newValue, offset, false, false, false);
+}
+
+
+void objc_setProperty_atomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offset)
+{
+    reallySetProperty(self, _cmd, newValue, offset, true, true, false);
+}
+
+void objc_setProperty_nonatomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offset)
+{
+    reallySetProperty(self, _cmd, newValue, offset, false, true, false);
+}
+```
+
+1. `atomic`和`nonatomic`，原子性关键字，从`get`和`set`相应函数中发现，`atomic`时，会加锁，相应地会损耗性能
+2. `copy`和`mutableCopy`，这些关键字的`get`函数相同，`set`函数根据情况不同传递不同参数给`reallySetProperty`函数进行设置，新实例对象会引用计数加一，旧的实例对象减一
+3. `strong`，强引用关键字，调用的是`id objc_autoreleaseReturnValue(id obj)`和`void objc_storeStrong(id *location, id obj)`，`copy`和`mutableCopy`最后都会调用想同的函数，但最终的本质都是`objc_retain`和`objc_release`
+4. `weak`，弱引用关键字，调用的是`id objc_loadWeak(id *location)`和`id objc_storeWeak(id *location, id newObj)`，
 
 ## 3.4 Category & Extension
 
