@@ -25,9 +25,10 @@ categories: Objective-C
   - [3.1 Reference count](#31-reference-count)
   - [3.2 `SEL` & `IMP`](#32-sel--imp)
   - [3.3 Property](#33-property)
-  - [3.4 Category & Extension](#34-category--extension)
+  - [3.4 Extension & Category](#34-extension--category)
   - [3.5 Association object](#35-association-object)
   - [3.6 Autoreleasepool](#36-autoreleasepool)
+- [4. 加载流程](#4-加载流程)
 
 # 1. 前言
 
@@ -1896,9 +1897,139 @@ void objc_setProperty_nonatomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t o
 3. `strong`，强引用关键字，调用的是`id objc_autoreleaseReturnValue(id obj)`和`void objc_storeStrong(id *location, id obj)`，`copy`和`mutableCopy`最后都会调用想同的函数，但最终的本质都是`objc_retain`和`objc_release`
 4. `weak`，弱引用关键字，调用的是`id objc_loadWeak(id *location)`和`id objc_storeWeak(id *location, id newObj)`，
 
-## 3.4 Category & Extension
+## 3.4 Extension & Category
 
-&emsp;&emsp;
+&emsp;&emsp;Extension与Category都是ObjC中的特性，为这门语言提供了更多灵活。
+
+&emsp;&emsp;先来看异同：
+
+1. 参与时：Extension在编译时，Category在运行时
+2. ivar：Extension可添加ivar，Category只能通过Association Object达到相同效果，这是由`objc_class`中的数据结构实现决定的
+3. @implementation：Extension没有自己独立的实现部分，Category有自己独立的实现部分
+4. 添加限制：Extension不能添加到不可修改的代码中运行，Category可添加到不可修改的代码中运行
+
+&emsp;&emsp;再看看Category的实现：
+
+```ObjC
+struct locstamped_category_t {
+    category_t *cat;
+    struct header_info *hi;
+};
+
+struct category_t {
+    const char *name;
+    classref_t cls;
+    struct method_list_t *instanceMethods;
+    struct method_list_t *classMethods;
+    struct protocol_list_t *protocols;
+    struct property_list_t *instanceProperties;
+    // Fields below this point are not always present on disk.
+    struct property_list_t *_classProperties;
+
+    method_list_t *methodsForMeta(bool isMeta) {
+        if (isMeta) return classMethods;
+        else return instanceMethods;
+    }
+
+    property_list_t *propertiesForMeta(bool isMeta, struct header_info *hi);
+    
+    protocol_list_t *protocolsForMeta(bool isMeta) {
+        if (isMeta) return nullptr;
+        else return protocols;
+    }
+};
+
+class category_list : nocopy_t {
+    union {
+        locstamped_category_t lc;
+        struct {
+            locstamped_category_t *array;
+            // this aliases with locstamped_category_t::hi
+            // which is an aliased pointer
+            uint32_t is_array :  1;
+            uint32_t count    : 31;
+            uint32_t size     : 32;
+        };
+    } _u;
+
+public:
+    category_list() : _u{{nullptr, nullptr}} { }
+    category_list(locstamped_category_t lc) : _u{{lc}} { }
+    category_list(category_list &&other) : category_list() {
+        std::swap(_u, other._u);
+    }
+    ~category_list()
+    {
+        if (_u.is_array) {
+            free(_u.array);
+        }
+    }
+
+    uint32_t count() const
+    {
+        if (_u.is_array) return _u.count;
+        return _u.lc.cat ? 1 : 0;
+    }
+
+    uint32_t arrayByteSize(uint32_t size) const
+    {
+        return sizeof(locstamped_category_t) * size;
+    }
+
+    const locstamped_category_t *array() const
+    {
+        return _u.is_array ? _u.array : &_u.lc;
+    }
+
+    void append(locstamped_category_t lc)
+    {
+        if (_u.is_array) {
+            if (_u.count == _u.size) {
+                // Have a typical malloc growth:
+                // - size <=  8: grow by 2
+                // - size <= 16: grow by 4
+                // - size <= 32: grow by 8
+                // ... etc
+                _u.size += _u.size < 8 ? 2 : 1 << (fls(_u.size) - 2);
+                _u.array = (locstamped_category_t *)reallocf(_u.array, arrayByteSize(_u.size));
+            }
+            _u.array[_u.count++] = lc;
+        } else if (_u.lc.cat == NULL) {
+            _u.lc = lc;
+        } else {
+            locstamped_category_t *arr = (locstamped_category_t *)malloc(arrayByteSize(2));
+            arr[0] = _u.lc;
+            arr[1] = lc;
+
+            _u.array = arr;
+            _u.is_array = true;
+            _u.count = 2;
+            _u.size = 2;
+        }
+    }
+
+    void erase(category_t *cat)
+    {
+        if (_u.is_array) {
+            for (int i = 0; i < _u.count; i++) {
+                if (_u.array[i].cat == cat) {
+                    // shift entries to preserve list order
+                    memmove(&_u.array[i], &_u.array[i+1], arrayByteSize(_u.count - i - 1));
+                    return;
+                }
+            }
+        } else if (_u.lc.cat == cat) {
+            _u.lc.cat = NULL;
+            _u.lc.hi = NULL;
+        }
+    }
+};
+```
+
+1. `category_list`内的联合体`_u`，和`weak_entry_t`相似，量少的时候单独处理，量大的时候使用散列表处理，内部函数也通过字节位判断区分处理
+2. `category_t`内记录了一个类可能存在的所有变量列表，这些类型，在微观的发掘中已经遇到过，就不展开了，并且在处理时，会区分是否元类来处理
+
+&emsp;&emsp;Category是在镜像加载的时候处理的，顺序比普通类迟，所以只要有Category重写了原类中的方法，那么Category中的实现就会覆盖原类中的，如果有多个Category重写同一个方法，按照顺序就是最后加载的Category的那个实现为准（这里引申了一个问题，假如二进制重排的order文件内的类顺序调整成与编译顺序不同，那最终的实现以哪个为准？XD）。
 
 ## 3.5 Association object
 
@@ -2801,8 +2932,9 @@ public:
    2. 然后判断当前自动释放池页的容量，如果少于一半就删除双向链表中的下个节点，否则保留
 6. 除了日常写代码时接触到的自动释放池使用，在`Runloop`中也有调用，其释放调用的是`static void tls_dealloc(void *p) `，具体细节在`CF`篇章再深究
 
+# 4. 加载流程
 
-&emsp;&emsp;最后对宏观中的3个部分做一个入口总览，在首次初始化镜像的时候，初始化流程会先把3个用于管理内存的散列表初始化，调用顺序如下：
+&emsp;&emsp;对宏观中的3个部分做一个入口总览，在首次初始化镜像的时候，初始化流程会先把3个用于管理内存的散列表初始化，调用顺序如下：
 
 1. `void map_images(unsigned count, const char * const paths[], const struct mach_header * const mhdrs[])`
 2. `void map_images_nolock(unsigned mhCount, const char * const mhPaths[], const struct mach_header * const mhdrs[])`
