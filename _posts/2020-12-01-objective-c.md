@@ -28,7 +28,7 @@ categories: Objective-C
   - [3.4 Extension & Category](#34-extension--category)
   - [3.5 Association object](#35-association-object)
   - [3.6 Autoreleasepool](#36-autoreleasepool)
-- [4. 加载流程](#4-加载流程)
+- [4. ObjC初始化流程](#4-objc初始化流程)
 
 # 1. 前言
 
@@ -2932,9 +2932,229 @@ public:
    2. 然后判断当前自动释放池页的容量，如果少于一半就删除双向链表中的下个节点，否则保留
 6. 除了日常写代码时接触到的自动释放池使用，在`Runloop`中也有调用，其释放调用的是`static void tls_dealloc(void *p) `，具体细节在`CF`篇章再深究
 
-# 4. 加载流程
+# 4. ObjC初始化流程
 
-&emsp;&emsp;对宏观中的3个部分做一个入口总览，在首次初始化镜像的时候，初始化流程会先把3个用于管理内存的散列表初始化，调用顺序如下：
+&emsp;&emsp;对于微观与宏观，再来一次串联，看ObjC的初始化过程中的处理：
+
+```ObjC
+/***********************************************************************
+* _objc_init
+* Bootstrap initialization. Registers our image notifier with dyld.
+* Called by libSystem BEFORE library initialization time
+**********************************************************************/
+
+void _objc_init(void)
+{
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+    
+    // fixme defer initialization until an objc-using image is found?
+    environ_init();
+    tls_init();
+    static_init();
+    runtime_init();
+    exception_init();
+    cache_init();
+    _imp_implementationWithBlock_init();
+
+    _dyld_objc_notify_register(&map_images, load_images, unmap_image);
+
+#if __OBJC2__
+    didCallDyldNotifyRegister = true;
+#endif
+}
+```
+
+1. `environ_init()`，初始化运行时环境变量，环境变量在`objc-env.h`中有列出，遍历并根据布尔值处理
+
+```ObjC
+// Settings from environment variables
+#define OPTION(var, env, help) bool var = false;
+#include "objc-env.h"
+#undef OPTION
+
+struct option_t {
+    bool* var;
+    const char *env;
+    const char *help;
+    size_t envlen;
+};
+
+const option_t Settings[] = {
+#define OPTION(var, env, help) option_t{&var, #env, help, strlen(#env)}, 
+#include "objc-env.h"
+#undef OPTION
+};
+```
+
+2. `tls_init()`，Thread Local Storage的初始化
+
+```ObjC
+void tls_init(void)
+{
+#if SUPPORT_DIRECT_THREAD_KEYS
+    pthread_key_init_np(TLS_DIRECT_KEY, &_objc_pthread_destroyspecific);
+#else
+    _objc_pthread_key = tls_create(&_objc_pthread_destroyspecific);
+#endif
+}
+```
+
+3. `static_init()`，C++静态构造函数的初始化
+
+```ObjC
+/***********************************************************************
+* static_init
+* Run C++ static constructor functions.
+* libc calls _objc_init() before dyld would call our static constructors, 
+* so we have to do it ourselves.
+**********************************************************************/
+static void static_init()
+{
+    size_t count;
+    auto inits = getLibobjcInitializers(&_mh_dylib_header, &count);
+    for (size_t i = 0; i < count; i++) {
+        inits[i]();
+    }
+}
+```
+
+1. `runtime_init()`，运行时初始化，Category和ObjC类的表初始化
+
+```ObjC
+
+class UnattachedCategories : public ExplicitInitDenseMap<Class, category_list> { /* ... */ } 
+static UnattachedCategories unattachedCategories;
+
+/***********************************************************************
+* allocatedClasses
+* A table of all classes (and metaclasses) which have been allocated
+* with objc_allocateClassPair.
+**********************************************************************/
+namespace objc {
+static ExplicitInitDenseSet<Class> allocatedClasses;
+}
+
+void runtime_init(void)
+{
+    objc::unattachedCategories.init(32);
+    objc::allocatedClasses.init();
+}
+```
+
+5. `exception_init()`，异常处理初始化，本质是指定异常处理的函数
+
+```ObjC
+/***********************************************************************
+* _objc_terminate
+* Custom std::terminate handler.
+*
+* The uncaught exception callback is implemented as a std::terminate handler. 
+* 1. Check if there's an active exception
+* 2. If so, check if it's an Objective-C exception
+* 3. If so, call our registered callback with the object.
+* 4. Finally, call the previous terminate handler.
+**********************************************************************/
+static void (*old_terminate)(void) = nil;
+static void _objc_terminate(void)
+{
+    if (PrintExceptions) {
+        _objc_inform("EXCEPTIONS: terminating");
+    }
+
+    if (! __cxa_current_exception_type()) {
+        // No current exception.
+        (*old_terminate)();
+    }
+    else {
+        // There is a current exception. Check if it's an objc exception.
+        @try {
+            __cxa_rethrow();
+        } @catch (id e) {
+            // It's an objc object. Call Foundation's handler, if any.
+            (*uncaught_handler)((id)e);
+            (*old_terminate)();
+        } @catch (...) {
+            // It's not an objc object. Continue to C++ terminate.
+            (*old_terminate)();
+        }
+    }
+}
+/***********************************************************************
+* exception_init
+* Initialize libobjc's exception handling system.
+* Called by map_images().
+**********************************************************************/
+void exception_init(void)
+{
+    old_terminate = std::set_terminate(&_objc_terminate);
+}
+```
+
+6. `cache_init()`，缓存初始化，iPhone设备中`HAVE_TASK_RESTARTABLE_RANGES`为1
+
+```ObjC
+// Define HAVE_TASK_RESTARTABLE_RANGES to enable usage of
+// task_restartable_ranges_synchronize()
+#if TARGET_OS_SIMULATOR || defined(__i386__) || defined(__arm__) || !TARGET_OS_MAC
+#   define HAVE_TASK_RESTARTABLE_RANGES 0
+#else
+#   define HAVE_TASK_RESTARTABLE_RANGES 1
+#endif
+
+void cache_init()
+{
+#if HAVE_TASK_RESTARTABLE_RANGES
+    mach_msg_type_number_t count = 0;
+    kern_return_t kr;
+
+    while (objc_restartableRanges[count].location) {
+        count++;
+    }
+
+    kr = task_restartable_ranges_register(mach_task_self(),
+                                          objc_restartableRanges, count);
+    if (kr == KERN_SUCCESS) return;
+    _objc_fatal("task_restartable_ranges_register failed (result 0x%x: %s)",
+                kr, mach_error_string(kr));
+#endif // HAVE_TASK_RESTARTABLE_RANGES
+}
+```
+
+
+7. `_imp_implementationWithBlock_init()`，在iphoneOS中没处理
+
+```OBJC
+/// Initialize the trampoline machinery. Normally this does nothing, as
+/// everything is initialized lazily, but for certain processes we eagerly load
+/// the trampolines dylib.
+void
+_imp_implementationWithBlock_init(void)
+{
+#if TARGET_OS_OSX
+    // Eagerly load libobjc-trampolines.dylib in certain processes. Some
+    // programs (most notably QtWebEngineProcess used by older versions of
+    // embedded Chromium) enable a highly restrictive sandbox profile which
+    // blocks access to that dylib. If anything calls
+    // imp_implementationWithBlock (as AppKit has started doing) then we'll
+    // crash trying to load it. Loading it here sets it up before the sandbox
+    // profile is enabled and blocks it.
+    //
+    // This fixes EA Origin (rdar://problem/50813789)
+    // and Steam (rdar://problem/55286131)
+    if (__progname &&
+        (strcmp(__progname, "QtWebEngineProcess") == 0 ||
+         strcmp(__progname, "Steam Helper") == 0)) {
+        Trampolines.Initialize();
+    }
+#endif
+}
+```
+
+8. `_dyld_objc_notify_register(&map_images, load_images, unmap_image)`，调用`dyld`提供的API，参数是函数指针，用于调用`map_images`、`load_images`和`unmap_image`函数
+
+&emsp;&emsp;这里再对宏观中的几个表做一个入口总览，在首次初始化镜像的时候，初始化流程会先把3个用于管理内存的散列表初始化，调用顺序如下：
 
 1. `void map_images(unsigned count, const char * const paths[], const struct mach_header * const mhdrs[])`
 2. `void map_images_nolock(unsigned mhCount, const char * const mhPaths[], const struct mach_header * const mhdrs[])`
