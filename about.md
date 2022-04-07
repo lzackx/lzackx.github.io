@@ -1,11 +1,15 @@
 ---
-layout: page
-title: About
-permalink: /about/
+layout: about
+image: /assets/sidebar-bg.png
+description: >
+  A boutique Jekyll theme for hackers, nerds, and academics,
+  with a focus on personal sites that are meant to impress.
+hide_description: true
+redirect_from:
+  - /download/
 ---
 
-This is the base Jekyll theme. You can find out more info about customizing your Jekyll theme, as well as basic Jekyll usage documentation at [jekyllrb.com](http://jekyllrb.com/)
+# About
 
-You can find the source code for the Jekyll new theme at: [github.com/jglovier/jekyll-new](https://github.com/jglovier/jekyll-new)
 
-You can find the source code for Jekyll at [github.com/jekyll/jekyll](https://github.com/jekyll/jekyll)
+<!--author-->
