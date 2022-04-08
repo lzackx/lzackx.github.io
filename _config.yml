@@ -69,7 +69,7 @@ cover: true
 # ---------------------------------------------------------------------------------------
 
 # theme: jekyll-theme-hydejack
-remote_theme: hydecorp/hydejack@v9
+remote_theme: lzackx/hydejack@v9
 
 
 # Customizaton
