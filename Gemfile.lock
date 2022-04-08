@@ -1,5 +1,5 @@
 PATH
-  remote: hydejack-9.1.6
+  remote: #hydejack-9.1.6
   specs:
     jekyll-theme-hydejack (9.1.6)
       bundler (>= 2.2.33)
