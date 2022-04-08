@@ -6,7 +6,7 @@ description: >
 hide_description: true
 ---
 
-# About
+# 关于
 
 
 <!--author-->
