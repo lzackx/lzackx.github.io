@@ -64,6 +64,20 @@ CocoaPods, 是市面上大部分iOS项目使用的集成依赖的工具, 它提�
 5. 二进制集成, 源码集成的原理
 
 
+#### 3.4 二进制模块的后台服务
 
+因为这里的方案是将二进制的Pod放到静态服务器中, 考虑到移植性和通用性, 将静态服务器部署到OCI容器中.
+
+由于`Docker`的背刺, 选择了`Podman`来管理镜像和容器, 但其实除了守护进程外, 没有啥区别.
+
+#### 3.5 总仓库
+
+[Zource](https://github.com/lzackx/Zource)是这一切的仓库, 考虑到目前`Swift`编译器对`Module`与`Class`傻傻分不清的坑, 暂时保持`Private`状态.
+
+## 4. 参考文章:
+
+* [美团 iOS 工程 zsource 命令背后的那些事儿](https://tech.meituan.com/2019/08/08/the-things-behind-the-ios-project-zsource-command.html)
+* [有赞iOS-基于二进制的编译提效策略](https://tech.youzan.com/you-zan-ji-yu-er-jin-zhi-de-bian-yi-ti-xiao-ce-lue/)
+* [cocoapods-imy-bin](https://github.com/MeetYouDevs/cocoapods-imy-bin)
 
 
