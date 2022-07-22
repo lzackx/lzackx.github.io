@@ -8,9 +8,11 @@ author1:
   # Used at the bottom of each page and at the top of the `about` layout
   # Markdown enabled, can use multiple paragraphs (enabled by `|`)
   about:             |
-    当生若烛
-    燃首至末
-    始终光明
+    <center>当生若烛</center>
+
+    <center>燃首至末</center>
+    
+    <center>始终光明</center>
 
   # This photo will be used in the about section
   picture:

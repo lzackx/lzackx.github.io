@@ -17,7 +17,7 @@ description:           >
 tagline:               当生若烛 燃首至末 始终光明
 
 # A list of keywords for your blog
-keywords:              [lzackx, App, iOS, Objective-C, Swift, React Native, Cordova, React]
+keywords:              [lzackx, App, iOS, Objective-C, Swift, React Native, Flutter, Cordova, React]
 
 # A (square) logo for your site.
 # If provided, it will be shown at the top of the sidebar.
@@ -40,6 +40,8 @@ menu:
     url:               /
   - title:             文章
     url:               /posts/
+  - title:             归档
+    url:               /archived/
   - title:             关于
     url:               /about/
 
