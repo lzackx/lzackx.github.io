@@ -6,11 +6,11 @@ description: >
 hide_description: true
 ---
 
-#
+# 关于
 
 君子可欺之以方，难罔以非其道.
 
 所以分先后, 审大小, 定善恶, 知行合一.
 
-#
+
 <!--author-->
