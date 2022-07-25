@@ -8,8 +8,8 @@ categories: Algorithm
 
 - [1. 数据结构定义](#1-数据结构定义)
   - [1.1 逻辑结构](#11-逻辑结构)
-    - [1.1.1 线性( 1 : 1 )](#111-线性-1--1-)
-    - [1.1.2 集合( N )](#112-集合-n-)
+    - [1.1.1 集合( N )](#111-集合-n-)
+    - [1.1.2 线性( 1 : 1 )](#112-线性-1--1-)
     - [1.1.3 树( 1 : N )](#113-树-1--n-)
     - [1.1.4 图( N : N )](#114-图-n--n-)
   - [1.2 存储结构](#12-存储结构)
@@ -26,17 +26,17 @@ categories: Algorithm
 
 ## 1.1 逻辑结构
 
-### 1.1.1 线性( 1 : 1 )
-
-数据结构中的元素存在一对一的相互关系.
-
-![线性](/assets/images/2022-08-01-data-structure-algorithm-definition-linear.png)
-
-### 1.1.2 集合( N )
+### 1.1.1 集合( N )
 
 数据元素间的关系是“属于同一个集合”.
 
 ![集合](/assets/images/2022-08-01-data-structure-algorithm-definition-collection.png)
+
+### 1.1.2 线性( 1 : 1 )
+
+数据结构中的元素存在一对一的相互关系.
+
+![线性](/assets/images/2022-08-01-data-structure-algorithm-definition-linear.png)
 
 ### 1.1.3 树( 1 : N )
 

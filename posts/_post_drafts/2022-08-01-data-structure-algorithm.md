@@ -9,4 +9,4 @@ categories: Algorithm
 - [1. 数据结构与算法(1.定义)](#1-数据结构与算法1定义)
 
 
-# 1. [数据结构与算法(1.定义)](./2022-08-01-data-structure-algorithm-definition.md)
+## 1. [数据结构与算法(1.定义)](./2022-08-01-data-structure-algorithm-definition.md)
