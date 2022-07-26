@@ -62,7 +62,7 @@ categories: Algorithm
 
 数据在地址离散的存储单元中存储的结构.
 
-![图](/assets/images/2022-08-01-data-structure-algorithm-definition-chain.png)
+![图](/assets/images/2022-08-01-data-structure-algorithm-definition-linked.png)
 
 
 # 2. 算法
