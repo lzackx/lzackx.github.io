@@ -18,7 +18,21 @@ categories: Algorithm
 
 # 1. 线性表
 
+* 逻辑结构: 1对1, 有序.
+
+* 存储结构: 连续存储.
+
+**例子: [LinearList](https://github.com/lzackx/Zone/tree/master/Demo/DataStructureAlgorithm/LinearList)**
+
+一个容易实现的线性表:
+
+1. 
+
 # 2. 链表
+
+* 逻辑结构: 1对1, 有序.
+
+* 存储结构: 链式存储.
 
 ## 2.1 单向链表
 
