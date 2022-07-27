@@ -9,7 +9,7 @@ categories: Algorithm
 - [1. 线性表](#1-线性表)
 - [2. 链表](#2-链表)
   - [2.1 单向链表](#21-单向链表)
-  - [2.2 单项循环链表](#22-单项循环链表)
+  - [2.2 单向循环链表](#22-单向循环链表)
   - [2.3 双向链表](#23-双向链表)
   - [2.4 双向循环链表](#24-双向循环链表)
 - [3. 栈](#3-栈)
@@ -49,6 +49,11 @@ categories: Algorithm
 
 * 存储结构: 链式存储.
 
+傻瓜式快速实现一个链表时, 会用到的一些归纳总结:
+1. 有效节点的逻辑索引`index`总是从`0`开始.
+2. 总是创建`Header`节点来**标记**首节点, 注意: 仅作标记作用.
+3. 好好写`get`和`length`方法, 能让逻辑更加清晰, 代码更加简单可读.
+
 ## 2.1 单向链表
 
 **例子: [SinglyLinkedList](https://github.com/lzackx/Zone/tree/master/Demo/DataStructureAlgorithm/SinglyLinkedList)**
@@ -67,11 +72,19 @@ categories: Algorithm
 图解:
 ![](/assets/images/2022-08-01-data-structure-algorithm-definition-linear-singly-linked-list.png)
 
-## 2.2 单项循环链表
+## 2.2 单向循环链表
 
 **例子: [SinglyCircularLinkedList](https://github.com/lzackx/Zone/tree/master/Demo/DataStructureAlgorithm/SinglyCircularLinkedList)**
 
 归纳总结单项循环链表:
+
+1. 因单向链表的操作都是从`index-1`位置开始操作`index`节点的, 所以单向循环列表需要特殊处理`index=0`的情况.
+   1. `insert`, 要移动`this->header->next = insertNode`的指向.
+   2. `delete`时, 要移动`this->header->next = this->header->next->next`的指向.
+2. 通过`length`来实现`traverse`或通过判断`node->next == this->header->next`来结束`traverse`循环.
+
+图解:
+![]()
 
 ## 2.3 双向链表
 
