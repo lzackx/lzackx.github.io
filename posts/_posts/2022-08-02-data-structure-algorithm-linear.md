@@ -52,7 +52,8 @@ categories: Algorithm
 傻瓜式快速实现一个链表时, 会用到的一些归纳总结:
 1. 有效节点的逻辑索引`index`总是从`0`开始.
 2. 总是创建`Header`节点来**标记**首节点, 注意: 仅作标记作用.
-3. 好好写`get`和`length`方法, 能让逻辑更加清晰, 代码更加简单可读.
+3. 重点处理`get`和`length`方法, 能让逻辑更加清晰, 代码更加简单可读.
+4. `insert`和`delete`操作可以总是通过`index - 1`的节点开始处理.
 
 ## 2.1 单向链表
 
@@ -107,6 +108,10 @@ categories: Algorithm
 
 归纳总结双向循环链表:
 
+1. 注意`index=0`时的`insert`和`delete`.
+
+图解:
+![](/assets/images/2022-08-01-data-structure-algorithm-definition-linear-doubly-circular-linked-list.png)
 
 # 3. 栈
 
