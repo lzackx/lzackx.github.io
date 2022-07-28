@@ -58,7 +58,7 @@ categories: Algorithm
 
 **例子: [SinglyLinkedList](https://github.com/lzackx/Zone/tree/master/Demo/DataStructureAlgorithm/SinglyLinkedList)**
 
-归纳总结单向链表:
+归纳总结单向链表: 离散排序的数据对象, 如按权重排序的数据表.
 
 1. 可创建标记节点`Header`, `Header`的数据可以被额外利用为记录链表长度, 可以让获取链表长度的实现时间复杂度更少, 仅作标记用.
 2. 出于健壮度的考虑, 实现一个链表的时候, 可以先实现`length`和`empty`方法. 为后面实现节点操作方法提供防止越界的判断方便.
@@ -76,15 +76,18 @@ categories: Algorithm
 
 **例子: [SinglyCircularLinkedList](https://github.com/lzackx/Zone/tree/master/Demo/DataStructureAlgorithm/SinglyCircularLinkedList)**
 
+使用场景: 扑克发牌流程.
+
 归纳总结单项循环链表:
 
 1. 因单向链表的操作都是从`index-1`位置开始操作`index`节点的, 所以单向循环列表需要特殊处理`index=0`的情况.
    1. `insert`, 要移动`this->header->next = insertNode`的指向.
    2. `delete`时, 要移动`this->header->next = this->header->next->next`的指向.
-2. 通过`length`来实现`traverse`或通过判断`node->next == this->header->next`来结束`traverse`循环.
+2. 在`index = length`时`insert`, 或`add`时, 与正常插入无区别.
+3. 通过`length`来实现`traverse`或通过判断`node->next == this->header->next`来结束`traverse`循环.
 
 图解:
-![]()
+![](/assets/images/2022-08-01-data-structure-algorithm-definition-linear-singly-circular-linked-list.png)
 
 ## 2.3 双向链表
 
