@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "数据结构与算法(1.定义)"
+title:  "数据结构与算法(0.定义)"
 date:   2022-08-01 08:00:00
 categories: Algorithm
 ---
