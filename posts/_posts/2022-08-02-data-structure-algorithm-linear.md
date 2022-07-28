@@ -65,7 +65,7 @@ categories: Algorithm
 3. 添加节点的方式有2种:
    1. 头插法, 新节点在`Header`节点后插入添加.
    2. 尾插法, 新节点在链表末尾插入, 通常这种方式更符合使用习惯.
-4. `get`方法逐个遍历节点, 可被`insert`, `delete`, `traverse`方法方便使用.
+4. `get`方法逐个遍历节点, 可被`insert`, `delete`, `traverse`方法方便使用, 在`insert`的时候, 由于需要处理`index=0`和`index - 1`的情况, 所以准入条件需要额外处理`header`.
 5. `insert`, `delete`的规则是找到`index-1`位置再进行操作.
 6. 删减方法的实现要注意语言的内存管理问题, 可能需要手动释放内存(如C、C++).
 
@@ -94,6 +94,9 @@ categories: Algorithm
 **例子: [DoublyLinkedList](https://github.com/lzackx/Zone/tree/master/Demo/DataStructureAlgorithm/DoublyLinkedList)**
 
 归纳总结双向链表:
+
+1. 在单向链表的基础上节点添加了前驱节点的指针, 使得`insert`和`delete`时, 需要多处理`previouse`指针的指向.
+2. 有`previous`和`next`的指针后, 节点的操作会变得更便捷.
 
 ## 2.4 双向循环链表
 
