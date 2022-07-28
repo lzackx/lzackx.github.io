@@ -98,6 +98,9 @@ categories: Algorithm
 1. 在单向链表的基础上节点添加了前驱节点的指针, 使得`insert`和`delete`时, 需要多处理`previouse`指针的指向.
 2. 有`previous`和`next`的指针后, 节点的操作会变得更便捷.
 
+图解:
+![](/assets/images/2022-08-01-data-structure-algorithm-definition-linear-doubly-linked-list.png)
+
 ## 2.4 双向循环链表
 
 **例子: [DoublyCircularLinkedList](https://github.com/lzackx/Zone/tree/master/Demo/DataStructureAlgorithm/DoublyCircularLinkedList)**
