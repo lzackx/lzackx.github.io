@@ -39,6 +39,7 @@ categories: Algorithm
    1. `insert`由于需要往后挪位置, 所以需要从末尾开始遍历.
    2. `delete`由于需要往前挪位置, 所以可以从目标位置开始遍历.
 6. `clear`只需要将`length`重置为0, 在开辟过的内存空间中的数据会被认为是无效数据.
+7. 基于存储结构的`reverse`是通过首尾元素互换来实现的.
 
 图解:
 ![](/assets/images/2022-08-01-data-structure-algorithm-definition-linear-list.png)
@@ -54,6 +55,7 @@ categories: Algorithm
 2. 总是创建`Header`节点来**标记**首节点, 注意: 仅作标记作用.
 3. 重点处理`get`和`length`方法, 能让逻辑更加清晰, 代码更加简单可读.
 4. `insert`和`delete`操作可以总是通过`index - 1`的节点开始处理.
+5. 基于链式结构的`reverse`是通过首插遍历法来实现的.
 
 ## 2.1 单向链表
 
