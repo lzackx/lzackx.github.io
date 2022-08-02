@@ -6,6 +6,7 @@ categories: Algorithm
 ---
 **数据结构与算法(2.线性结构)**
 
+- [0. 前言](#0-前言)
 - [1. 线性表](#1-线性表)
 - [2. 链表](#2-链表)
   - [2.1 单向链表](#21-单向链表)
@@ -13,12 +14,37 @@ categories: Algorithm
   - [2.3 双向链表](#23-双向链表)
   - [2.4 双向循环链表](#24-双向循环链表)
 - [3. 栈](#3-栈)
+  - [3.1 线性栈](#31-线性栈)
+  - [3.2 链式栈](#32-链式栈)
 - [4. 队列](#4-队列)
+  - [3.1 线性队列](#31-线性队列)
+  - [3.2 链式队列](#32-链式队列)
 - [5. 字符串](#5-字符串)
 
-# 1. 线性表
+# 0. 前言
 
-* 逻辑结构: 1对1, 有序.
+线性结构在`存储结构`上, 有以下2种:
+
+* `顺序存储`
+* `链式存储`
+
+而多种逻辑结构皆可使用这2种`存储结构`实现.
+
+`顺序结构`, 是在内存中开辟连续的空间存放数据, 再对数据进行操作, 有以下特性:
+
+1. 存储空间大小固定, 从初始化时就被决定好了.
+2. `insert`操作可能需要腾挪其他数据的位置.
+3. `delete`操作可能要腾挪其他数据的位置.
+4. `get`操作可通`index`直接获得.
+
+`链式存储`, 是在内存中离散地存放数据, 再对数据进行操作, 有以下特性:
+
+1. 存储空间大小不固定, 可灵活调整数据数量.
+2. `insert`操作需要目标节点的`previous`和`next`一起操作指向.
+3. `delete`操作需要目标节点的`previous`和`next`一起操作指向.
+4. `get`操作需要通过遍历获取.
+
+# 1. 线性表
 
 * 存储结构: 连续存储.
 
@@ -45,8 +71,6 @@ categories: Algorithm
 ![](/assets/images/2022-08-01-data-structure-algorithm-definition-linear-list.png)
 
 # 2. 链表
-
-* 逻辑结构: 1对1, 有序.
 
 * 存储结构: 链式存储.
 
@@ -117,6 +141,39 @@ categories: Algorithm
 
 # 3. 栈
 
+栈是一种操作受限的线性数据结构, 数据操作遵循先进后出的规则.
+
+## 3.1 线性栈
+
+**例子: [LinearStack](https://github.com/lzackx/Zone/tree/master/Demo/DataStructureAlgorithm/LinearStack)**
+
+归纳总结线性栈:
+
+1. 由于栈的特性是只能操作栈顶, 线性栈的数据操作无需挪移数据.
+2. `traverse`操作是从栈顶往栈底的顺序进行.
+3. `clear`操作只需要充值栈顶索引.
+4. 初始化的`top`为-1, `top + 1`就是`length`
+
+图解:
+![](/assets/images/2022-08-01-data-structure-algorithm-definition-linear-stack.png)
+
+
+## 3.2 链式栈
+
+**例子: [LinkedStack](https://github.com/lzackx/Zone/tree/master/Demo/DataStructureAlgorithm/LinkedStack)**
+
+归纳总结链式栈:
+
+1. `push`操作其实就是头插法.
+2. `pop`操作无需释放节点.
+
+图解:
+![](/assets/images/2022-08-01-data-structure-algorithm-definition-linear-linked-stack.png)
+
 # 4. 队列
+
+## 3.1 线性队列
+
+## 3.2 链式队列
 
 # 5. 字符串
