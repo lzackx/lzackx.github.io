@@ -2,7 +2,7 @@
 layout: post
 title: lZackx
 description: >
-  不能用温柔对待黑暗，要用🔥
+  不能用温柔应对黑暗，要用🔥
 last_modified_at: 2022-01-01
 no_link_title: false 
 no_excerpt: false 
