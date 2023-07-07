@@ -72,7 +72,11 @@ CocoaPods, 是市面上大部分iOS项目使用的集成依赖的工具, 它提�
 
 #### 3.5 总仓库
 
-[Zource](https://github.com/lzackx/Zource)是这一切的仓库, 考虑到目前`Swift`编译器对`Module`与`Class`傻傻分不清的坑, 暂时保持`Private`状态.
+[Zource](https://github.com/lzackx/Zource)是这一切的仓库, 经历了3次迭代重构, 终于可以在商用App上使用了.
+
+该插件与美团的`ZSource`对比, 还欠缺集成二进制依赖时查看源码这个能力. 
+
+但已经完善了单项目单配置的能力, 每个项目, 都可以单独配置一份自己的静态私有依赖库, 无论是自己私人集成, 还是团队集成, 都能做到互不干扰.
 
 ## 4. 参考文章:
 
